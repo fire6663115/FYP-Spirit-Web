@@ -8,6 +8,7 @@
         * {
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
         }
 
         body {
@@ -21,9 +22,9 @@
             height: 100vh;
             overflow: hidden;
             user-select: none;
+            -webkit-user-select: none;
         }
 
-        /* 畫面切換控制 */
         .screen {
             display: none;
             flex-direction: column;
@@ -43,14 +44,10 @@
             font-size: 28px;
             color: #00ffff;
             text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            margin-bottom: 10px;
         }
 
-        h2 {
-            font-size: 22px;
-            color: #ffcc00;
-        }
-
-        /* 狀態 1：等待畫面 */
+        /* 等待與抽卡 UI */
         .loader {
             border: 6px solid #333;
             border-top: 6px solid #00ffff;
@@ -71,13 +68,12 @@
             }
         }
 
-        /* 狀態 2：戰鬥支援 (抽卡) */
         .card {
             background: linear-gradient(135deg, #443366, #221144);
             border: 2px solid #aa88ff;
             border-radius: 15px;
-            padding: 30px 20px;
-            margin: 20px 0;
+            padding: 20px;
+            margin: 15px 0;
             width: 80%;
             max-width: 300px;
             box-shadow: 0 0 20px rgba(170, 136, 255, 0.4);
@@ -88,7 +84,6 @@
             font-weight: bold;
             color: #fff;
             margin: 10px 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         .btn-summon {
@@ -101,20 +96,38 @@
             border-radius: 30px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(0, 204, 102, 0.4);
-            transition: transform 0.1s;
+            transition: 0.1s;
         }
 
             .btn-summon:active {
                 transform: scale(0.95);
             }
 
-            .btn-summon:disabled {
-                background: #555;
-                box-shadow: none;
-                cursor: not-allowed;
-            }
+        /* 虛擬搖桿 UI */
+        #joystick-area {
+            display: none;
+            margin-top: 30px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            position: relative;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+        }
 
-        /* 狀態 3 & 4：封印 QTE 雙手連打 */
+        #joystick-knob {
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #00ffff, #0088ff);
+            border-radius: 50%;
+            position: absolute;
+            top: 60px;
+            left: 60px;
+            box-shadow: 0 0 15px #00ffff;
+            pointer-events: none;
+        }
+
+        /* 封印 QTE 雙手連打 */
         #tapCount {
             font-size: 56px;
             font-weight: bold;
@@ -143,17 +156,12 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: 0.05s;
             box-shadow: inset 0 0 20px rgba(255, 59, 48, 0.5);
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
         }
 
             .tap-zone:active {
                 background: rgba(255, 59, 48, 0.6);
                 transform: scale(0.96);
-                box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
 
         .pulse {
@@ -174,82 +182,72 @@
 </head>
 <body>
 
-    <!-- 畫面 1：等待主機 -->
     <div id="screen-waiting" class="screen active">
         <div class="loader"></div>
         <h1>等待主機開始遊戲...</h1>
-        <p style="color: #888;">請看著大螢幕的指示</p>
     </div>
 
-    <!-- 畫面 2：戰鬥支援 -->
     <div id="screen-battle" class="screen">
-        <h1>⚔️ 戰鬥已開始！</h1>
-        <p>你被分配到的支援怪獸是：</p>
-        <div class="card">
+        <h1 id="battle-title">⚔️ 戰鬥支援</h1>
+        <div class="card" id="summon-card">
             <div style="font-size: 40px;" id="monster-icon">🐉</div>
             <div class="monster-name" id="monster-name">隨機怪獸</div>
         </div>
-        <button id="btn-summon" class="btn-summon" onclick="summonMonster()">召喚支援！</button>
-        <p id="summon-status" style="margin-top: 15px; color: #00ffff; display: none;">✅ 已派遣支援！請看大螢幕！</p>
+        <button id="btn-summon" class="btn-summon" onclick="summonMonster()">召喚並操控！</button>
+
+        <!-- 召喚後顯示虛擬搖桿 -->
+        <div id="joystick-area">
+            <div id="joystick-knob"></div>
+        </div>
     </div>
 
-    <!-- 畫面 3：準備封印 -->
     <div id="screen-sealing-prep" class="screen">
         <h1 class="pulse">⚠️ 警告 ⚠️</h1>
         <h2>Boss 瀕死！準備封印！</h2>
-        <p>請活動你的手指，準備瘋狂點擊！</p>
     </div>
 
-    <!-- 畫面 4：瘋狂封印 (雙手連打版) -->
     <div id="screen-sealing" class="screen">
         <h1>緊急封印中！</h1>
         <div id="tapCount">0 下</div>
         <div class="tap-container">
-            <div class="tap-zone" id="tapLeft">👈<br>左手<br>狂點</div>
-            <div class="tap-zone" id="tapRight">👉<br>右手<br>狂點</div>
+            <div class="tap-zone" id="tapLeft">👈<br>左手</div>
+            <div class="tap-zone" id="tapRight">👉<br>右手</div>
         </div>
     </div>
 
     <script>
-        // ⚠️ 已修正為帶有 /coop_session 的正確路徑 (不加 .json)
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
-
         const userId = "user_" + Math.floor(Math.random() * 1000000);
         let currentState = "waiting";
         let hasSummoned = false;
 
-        // 怪獸卡池 (你可以在這裡新增你遊戲裡的怪獸名字)
+        // 怪獸卡池 (名稱需與 Unity 中的配置名稱一致)
         const monsterPool = [
             { name: "烈焰龍", icon: "🐉" },
             { name: "水岩獸", icon: "🐢" },
-            { name: "風雷鳥", icon: "🦅" },
-            { name: "暗影狼", icon: "🐺" }
+            { name: "風雷鳥", icon: "🦅" }
         ];
         let myMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
 
-        // 初始化 UI
         document.getElementById("monster-name").innerText = myMonster.name;
         document.getElementById("monster-icon").innerText = myMonster.icon;
 
-        // 輪詢遊戲狀態 (每 1 秒問一次 Firebase 現在主機在幹嘛)
         setInterval(fetchGameState, 1000);
 
         function fetchGameState() {
             fetch(`${FIREBASE_BASE_URL}/state.json`)
                 .then(res => res.json())
                 .then(state => {
-                    // Firebase 返回的字串可能帶有引號，需清乾淨
                     if (state) state = state.replace(/"/g, '');
                     if (state && state !== currentState) {
                         currentState = state;
                         switchScreen(currentState);
                     }
-                }).catch(err => console.log("等待連線中..."));
+                }).catch(err => { });
         }
 
         function switchScreen(stateId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            // 根據狀態顯示對應畫面，如果找不到對應的，預設顯示 waiting
             const targetScreen = document.getElementById('screen-' + stateId.replace('_', '-')) || document.getElementById('screen-waiting');
             targetScreen.classList.add('active');
         }
@@ -259,31 +257,78 @@
             if (hasSummoned) return;
             hasSummoned = true;
 
-            const btn = document.getElementById("btn-summon");
-            btn.disabled = true;
-            btn.innerText = "召喚冷卻中...";
-            document.getElementById("summon-status").style.display = "block";
+            document.getElementById("btn-summon").style.display = "none";
+            document.getElementById("summon-card").style.display = "none";
+            document.getElementById("battle-title").innerText = "🕹️ 操控你的怪獸";
+            document.getElementById("joystick-area").style.display = "block"; // 顯示搖桿
 
-            // 寫入 Firebase spawns.json
             const payload = {};
-            payload[userId] = myMonster.name; // 傳送怪獸名字給 Unity
-
-            fetch(`${FIREBASE_BASE_URL}/spawns.json`, {
-                method: 'PATCH',
-                body: JSON.stringify(payload)
-            });
+            payload[userId] = myMonster.name;
+            fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
         }
 
-        // --- 瘋狂點擊封印功能 (雙按鈕) ---
+        // --- 虛擬搖桿功能 ---
+        const joyArea = document.getElementById("joystick-area");
+        const joyKnob = document.getElementById("joystick-knob");
+        let joyActive = false;
+        let joyData = { x: 0, y: 0 };
+        let lastSentData = { x: 0, y: 0 };
+
+        joyArea.addEventListener("pointerdown", startJoy);
+        joyArea.addEventListener("pointermove", moveJoy);
+        window.addEventListener("pointerup", endJoy);
+
+        function startJoy(e) { joyActive = true; moveJoy(e); }
+        function endJoy(e) {
+            joyActive = false;
+            joyKnob.style.transform = `translate(0px, 0px)`;
+            joyData = { x: 0, y: 0 };
+            sendJoystickData(); // 歸零
+        }
+        function moveJoy(e) {
+            if (!joyActive) return;
+            const rect = joyArea.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            const maxRadius = 60;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > maxRadius) {
+                dx = (dx / distance) * maxRadius;
+                dy = (dy / distance) * maxRadius;
+            }
+
+            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+            // 轉換為 -1.0 到 1.0 之間
+            joyData.x = (dx / maxRadius).toFixed(2);
+            joyData.y = -(dy / maxRadius).toFixed(2); // 反轉 Y 軸適應 Unity
+        }
+
+        // 每 150 毫秒傳送一次搖桿數據 (避免過度請求 Firebase)
+        setInterval(() => {
+            if (hasSummoned && currentState === "battle") {
+                if (joyData.x !== lastSentData.x || joyData.y !== lastSentData.y) {
+                    sendJoystickData();
+                    lastSentData.x = joyData.x;
+                    lastSentData.y = joyData.y;
+                }
+            }
+        }, 150);
+
+        function sendJoystickData() {
+            const payload = {};
+            payload[userId] = `${joyData.x},${joyData.y}`;
+            fetch(`${FIREBASE_BASE_URL}/joysticks.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+        }
+
+        // --- 封印連打功能 ---
         let taps = 0;
         let isUploadingTaps = false;
-
-        function registerTap() {
-            taps++;
-            document.getElementById("tapCount").innerText = taps + " 下";
-        }
-
-        // 綁定左右兩邊的點擊事件 (pointerdown 支援滑鼠與手機觸控，且沒有延遲)
+        function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
@@ -292,11 +337,8 @@
                 isUploadingTaps = true;
                 const payload = {};
                 payload[userId] = taps;
-
-                fetch(`${FIREBASE_BASE_URL}/taps.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify(payload)
-                }).then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
+                fetch(`${FIREBASE_BASE_URL}/taps.json`, { method: 'PATCH', body: JSON.stringify(payload) })
+                    .then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
             }
         }, 500);
     </script>
