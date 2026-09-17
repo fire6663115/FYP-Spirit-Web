@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FYP 協同封印支援</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #111;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: sans-serif;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 24px;
+            color: #00ffff;
+        }
+
+        #tapCount {
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            color: #ff00ff;
+        }
+
+        #tapButton {
+            width: 80vw;
+            height: 80vw;
+            max-width: 300px;
+            max-height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff3b30, #990000);
+            border: 8px solid #ff9999;
+            box-shadow: 0 0 30px #ff3b30;
+            font-size: 32px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+        }
+
+            #tapButton:active {
+                transform: scale(0.95);
+                background: radial-gradient(circle, #cc0000, #660000);
+            }
+    </style>
+</head>
+<body>
+    <h1>緊急封印中！請支援！</h1>
+    <div id="tapCount">0 下</div>
+    <button id="tapButton">瘋狂點擊</button>
+
+    <script>
+        // ⚠️ 把這裡換成你 Unity 裡填的那串完整 URL
+        const FIREBASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session/taps.json";
+
+        // 隨機產生一個屬於這支手機的獨立 ID，防止覆蓋其他玩家的點擊
+        const userId = "user_" + Math.floor(Math.random() * 1000000);
+        let taps = 0;
+        let isUploading = false;
+
+        document.getElementById("tapButton").addEventListener("pointerdown", () => {
+            taps++;
+            document.getElementById("tapCount").innerText = taps + " 下";
+        });
+
+        // 每 0.5 秒把點擊次數「打包」上傳給 Firebase (防止流量過高)
+        setInterval(() => {
+            if (taps > 0 && !isUploading) {
+                isUploading = true;
+
+                // 使用 PATCH 只更新自己的資料，不影響其他正在點擊的玩家
+                const payload = {};
+                payload[userId] = taps;
+
+                fetch(FIREBASE_URL, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    isUploading = false;
+                }).catch(err => {
+                    console.error(err);
+                    isUploading = false;
+                });
+            }
+        }, 500);
+    </script>
+</body>
+</html>
