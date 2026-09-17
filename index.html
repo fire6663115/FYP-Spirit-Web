@@ -3,43 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FYP 協同封印支援</title>
+    <title>FYP 協同作戰系統</title>
     <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
         body {
             margin: 0;
-            background-color: #111;
+            background-color: #1a1a2e;
             color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            font-family: sans-serif;
+            overflow: hidden;
             user-select: none;
         }
 
-        h1 {
-            margin-bottom: 10px;
-            font-size: 24px;
-            color: #00ffff;
+        /* 畫面切換控制 */
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            padding: 20px;
         }
 
+            .screen.active {
+                display: flex;
+            }
+
+        h1 {
+            font-size: 28px;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        h2 {
+            font-size: 22px;
+            color: #ffcc00;
+        }
+
+        /* 狀態 1：等待畫面 */
+        .loader {
+            border: 6px solid #333;
+            border-top: 6px solid #00ffff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 狀態 2：戰鬥支援 (抽卡) */
+        .card {
+            background: linear-gradient(135deg, #443366, #221144);
+            border: 2px solid #aa88ff;
+            border-radius: 15px;
+            padding: 30px 20px;
+            margin: 20px 0;
+            width: 80%;
+            max-width: 300px;
+            box-shadow: 0 0 20px rgba(170, 136, 255, 0.4);
+        }
+
+        .monster-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            margin: 10px 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .btn-summon {
+            background: #00cc66;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 204, 102, 0.4);
+            transition: transform 0.1s;
+        }
+
+            .btn-summon:active {
+                transform: scale(0.95);
+            }
+
+            .btn-summon:disabled {
+                background: #555;
+                box-shadow: none;
+                cursor: not-allowed;
+            }
+
+        /* 狀態 3：封印 QTE */
         #tapCount {
-            font-size: 40px;
+            font-size: 48px;
             font-weight: bold;
             margin-bottom: 30px;
             color: #ff00ff;
         }
 
         #tapButton {
-            width: 80vw;
-            height: 80vw;
-            max-width: 300px;
-            max-height: 300px;
+            width: 70vw;
+            height: 70vw;
+            max-width: 250px;
+            max-height: 250px;
             border-radius: 50%;
             background: radial-gradient(circle, #ff3b30, #990000);
             border: 8px solid #ff9999;
-            box-shadow: 0 0 30px #ff3b30;
+            box-shadow: 0 0 40px #ff3b30;
             font-size: 32px;
             font-weight: bold;
             color: white;
@@ -47,48 +138,145 @@
         }
 
             #tapButton:active {
-                transform: scale(0.95);
+                transform: scale(0.92);
                 background: radial-gradient(circle, #cc0000, #660000);
+                box-shadow: 0 0 60px #ff3b30;
             }
+
+        .pulse {
+            animation: pulseAnim 1s infinite alternate;
+        }
+
+        @keyframes pulseAnim {
+            from {
+                transform: scale(1);
+            }
+
+            to {
+                transform: scale(1.05);
+                color: #ff3333;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>緊急封印中！請支援！</h1>
-    <div id="tapCount">0 下</div>
-    <button id="tapButton">瘋狂點擊</button>
+
+    <!-- 畫面 1：等待主機 -->
+    <div id="screen-waiting" class="screen active">
+        <div class="loader"></div>
+        <h1>等待主機開始遊戲...</h1>
+        <p style="color: #888;">請看著大螢幕的指示</p>
+    </div>
+
+    <!-- 畫面 2：戰鬥支援 -->
+    <div id="screen-battle" class="screen">
+        <h1>⚔️ 戰鬥已開始！</h1>
+        <p>你被分配到的支援怪獸是：</p>
+        <div class="card">
+            <div style="font-size: 40px;" id="monster-icon">🐉</div>
+            <div class="monster-name" id="monster-name">隨機怪獸</div>
+        </div>
+        <button id="btn-summon" class="btn-summon" onclick="summonMonster()">召喚支援！</button>
+        <p id="summon-status" style="margin-top: 15px; color: #00ffff; display: none;">✅ 已派遣支援！請看大螢幕！</p>
+    </div>
+
+    <!-- 畫面 3：準備封印 -->
+    <div id="screen-sealing-prep" class="screen">
+        <h1 class="pulse">⚠️ 警告 ⚠️</h1>
+        <h2>Boss 瀕死！準備封印！</h2>
+        <p>請活動你的手指，準備瘋狂點擊！</p>
+    </div>
+
+    <!-- 畫面 4：瘋狂封印 -->
+    <div id="screen-sealing" class="screen">
+        <h1>緊急封印中！</h1>
+        <div id="tapCount">0 下</div>
+        <button id="tapButton">點擊封印</button>
+    </div>
 
     <script>
-        // ⚠️ 把這裡換成你 Unity 裡填的那串完整 URL
-        const FIREBASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session/taps.json";
+        // ⚠️⚠️⚠️ 替換成你的 Firebase URL (不要加上 .json，只要到 coop_session 結束) ⚠️⚠️⚠️
+        const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/";
 
-        // 隨機產生一個屬於這支手機的獨立 ID，防止覆蓋其他玩家的點擊
         const userId = "user_" + Math.floor(Math.random() * 1000000);
+        let currentState = "waiting";
+        let hasSummoned = false;
+
+        // 怪獸卡池 (你可以在這裡新增你遊戲裡的怪獸名字)
+        const monsterPool = [
+            { name: "烈焰龍", icon: "🐉" },
+            { name: "水岩獸", icon: "🐢" },
+            { name: "風雷鳥", icon: "🦅" },
+            { name: "暗影狼", icon: "🐺" }
+        ];
+        let myMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+
+        // 初始化 UI
+        document.getElementById("monster-name").innerText = myMonster.name;
+        document.getElementById("monster-icon").innerText = myMonster.icon;
+
+        // 輪詢遊戲狀態 (每 1 秒問一次 Firebase 現在主機在幹嘛)
+        setInterval(fetchGameState, 1000);
+
+        function fetchGameState() {
+            fetch(`${FIREBASE_BASE_URL}/state.json`)
+                .then(res => res.json())
+                .then(state => {
+                    // Firebase 返回的字串可能帶有引號，需清乾淨
+                    if (state) state = state.replace(/"/g, '');
+                    if (state && state !== currentState) {
+                        currentState = state;
+                        switchScreen(currentState);
+                    }
+                }).catch(err => console.log("等待連線中..."));
+        }
+
+        function switchScreen(stateId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            // 根據狀態顯示對應畫面，如果找不到對應的，預設顯示 waiting
+            const targetScreen = document.getElementById('screen-' + stateId.replace('_', '-')) || document.getElementById('screen-waiting');
+            targetScreen.classList.add('active');
+        }
+
+        // --- 召喚功能 ---
+        function summonMonster() {
+            if (hasSummoned) return;
+            hasSummoned = true;
+
+            const btn = document.getElementById("btn-summon");
+            btn.disabled = true;
+            btn.innerText = "召喚冷卻中...";
+            document.getElementById("summon-status").style.display = "block";
+
+            // 寫入 Firebase spawns.json
+            const payload = {};
+            payload[userId] = myMonster.name; // 傳送怪獸名字給 Unity
+
+            fetch(`${FIREBASE_BASE_URL}/spawns.json`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            });
+        }
+
+        // --- 瘋狂點擊封印功能 ---
         let taps = 0;
-        let isUploading = false;
+        let isUploadingTaps = false;
 
         document.getElementById("tapButton").addEventListener("pointerdown", () => {
             taps++;
             document.getElementById("tapCount").innerText = taps + " 下";
         });
 
-        // 每 0.5 秒把點擊次數「打包」上傳給 Firebase (防止流量過高)
         setInterval(() => {
-            if (taps > 0 && !isUploading) {
-                isUploading = true;
-
-                // 使用 PATCH 只更新自己的資料，不影響其他正在點擊的玩家
+            if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
+                isUploadingTaps = true;
                 const payload = {};
                 payload[userId] = taps;
 
-                fetch(FIREBASE_URL, {
+                fetch(`${FIREBASE_BASE_URL}/taps.json`, {
                     method: 'PATCH',
                     body: JSON.stringify(payload)
-                }).then(() => {
-                    isUploading = false;
-                }).catch(err => {
-                    console.error(err);
-                    isUploading = false;
-                });
+                }).then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
             }
         }, 500);
     </script>
