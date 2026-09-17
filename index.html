@@ -8,7 +8,6 @@
         * {
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            touch-action: none;
         }
 
         body {
@@ -22,7 +21,6 @@
             height: 100vh;
             overflow: hidden;
             user-select: none;
-            -webkit-user-select: none;
         }
 
         .screen {
@@ -47,7 +45,12 @@
             margin-bottom: 10px;
         }
 
-        /* 等待與抽卡 UI */
+        p {
+            margin-top: 0;
+            color: #ccc;
+        }
+
+        /* 等待動畫 */
         .loader {
             border: 6px solid #333;
             border-top: 6px solid #00ffff;
@@ -68,12 +71,13 @@
             }
         }
 
+        /* 召喚卡片 */
         .card {
             background: linear-gradient(135deg, #443366, #221144);
             border: 2px solid #aa88ff;
             border-radius: 15px;
-            padding: 20px;
-            margin: 15px 0;
+            padding: 30px 20px;
+            margin: 20px 0;
             width: 80%;
             max-width: 300px;
             box-shadow: 0 0 20px rgba(170, 136, 255, 0.4);
@@ -86,7 +90,7 @@
             margin: 10px 0;
         }
 
-        .btn-summon {
+        .btn-main {
             background: #00cc66;
             color: white;
             border: none;
@@ -96,38 +100,62 @@
             border-radius: 30px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(0, 204, 102, 0.4);
-            transition: 0.1s;
+            width: 80%;
         }
 
-            .btn-summon:active {
+            .btn-main:active {
                 transform: scale(0.95);
             }
 
-        /* 虛擬搖桿 UI */
-        #joystick-area {
-            display: none;
-            margin-top: 30px;
-            width: 200px;
-            height: 200px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 50%;
-            position: relative;
-            border: 2px solid rgba(0, 255, 255, 0.3);
+        /* 控制面板 (虛擬指令) */
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 90vw;
+            max-width: 400px;
+            margin-top: 20px;
         }
 
-        #joystick-knob {
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, #00ffff, #0088ff);
-            border-radius: 50%;
-            position: absolute;
-            top: 60px;
-            left: 60px;
-            box-shadow: 0 0 15px #00ffff;
-            pointer-events: none;
+        .cmd-btn {
+            background: #2a2a4e;
+            border: 2px solid #555588;
+            color: white;
+            border-radius: 15px;
+            padding: 20px 10px;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.1s;
         }
 
-        /* 封印 QTE 雙手連打 */
+            .cmd-btn.active-cmd {
+                background: #443388;
+                border-color: #aa88ff;
+                box-shadow: 0 0 15px rgba(170, 136, 255, 0.6);
+            }
+
+            .cmd-btn:active {
+                transform: scale(0.95);
+                background: #5544aa;
+            }
+
+        .ult-btn {
+            grid-column: span 2;
+            background: linear-gradient(90deg, #ff3366, #cc0033);
+            border: 2px solid #ff9999;
+            box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+        }
+
+            .ult-btn:active {
+                background: #990000;
+            }
+
+        /* 封印 QTE */
         #tapCount {
             font-size: 56px;
             font-weight: bold;
@@ -139,7 +167,7 @@
         .tap-container {
             display: flex;
             width: 90vw;
-            height: 50vh;
+            height: 40vh;
             gap: 15px;
             margin-top: 10px;
         }
@@ -156,187 +184,148 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: inset 0 0 20px rgba(255, 59, 48, 0.5);
+            touch-action: manipulation;
         }
 
             .tap-zone:active {
                 background: rgba(255, 59, 48, 0.6);
                 transform: scale(0.96);
+                box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
-
-        .pulse {
-            animation: pulseAnim 1s infinite alternate;
-        }
-
-        @keyframes pulseAnim {
-            from {
-                transform: scale(1);
-            }
-
-            to {
-                transform: scale(1.05);
-                color: #ff3333;
-            }
-        }
     </style>
 </head>
 <body>
 
+    <!-- 畫面 1：等待 -->
     <div id="screen-waiting" class="screen active">
         <div class="loader"></div>
         <h1>等待主機開始遊戲...</h1>
+        <p>請看著大螢幕的指示</p>
     </div>
 
-    <div id="screen-battle" class="screen">
-        <h1 id="battle-title">⚔️ 戰鬥支援</h1>
-        <div class="card" id="summon-card">
+    <!-- 畫面 2：抽卡召喚 -->
+    <div id="screen-battle-summon" class="screen">
+        <h1>⚔️ 戰鬥已開始！</h1>
+        <p>你抽到的支援怪獸是：</p>
+        <div class="card">
             <div style="font-size: 40px;" id="monster-icon">🐉</div>
-            <div class="monster-name" id="monster-name">隨機怪獸</div>
+            <div class="monster-name" id="monster-name">載入中...</div>
         </div>
-        <button id="btn-summon" class="btn-summon" onclick="summonMonster()">召喚並操控！</button>
+        <button class="btn-main" onclick="summonMonster()">召喚支援！</button>
+    </div>
 
-        <!-- 召喚後顯示虛擬搖桿 -->
-        <div id="joystick-area">
-            <div id="joystick-knob"></div>
+    <!-- 畫面 2.5：怪獸控制台 (召喚後顯示) -->
+    <div id="screen-battle-control" class="screen">
+        <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
+        <p>你的怪獸已加入戰場，請下達指令！</p>
+        <div class="control-grid">
+            <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
+            <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
+            <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
+            <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
+            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 釋放終極大招！</div>
         </div>
     </div>
 
+    <!-- 畫面 3：警告 -->
     <div id="screen-sealing-prep" class="screen">
-        <h1 class="pulse">⚠️ 警告 ⚠️</h1>
-        <h2>Boss 瀕死！準備封印！</h2>
+        <h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1>
+        <h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2>
     </div>
 
+    <!-- 畫面 4：封印雙打 -->
     <div id="screen-sealing" class="screen">
         <h1>緊急封印中！</h1>
         <div id="tapCount">0 下</div>
         <div class="tap-container">
-            <div class="tap-zone" id="tapLeft">👈<br>左手</div>
-            <div class="tap-zone" id="tapRight">👉<br>右手</div>
+            <div class="tap-zone" id="tapLeft">👈 左手狂點</div>
+            <div class="tap-zone" id="tapRight">右手狂點 👉</div>
         </div>
     </div>
 
     <script>
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
         const userId = "user_" + Math.floor(Math.random() * 1000000);
+
         let currentState = "waiting";
         let hasSummoned = false;
+        let currentCommand = "Free";
 
-        // 怪獸卡池 (名稱需與 Unity 中的配置名稱一致)
+        // 與 Unity 配置對齊的卡池 (名字必須與 Unity 裡的 MonsterData 名字一致！)
         const monsterPool = [
             { name: "烈焰龍", icon: "🐉" },
             { name: "水岩獸", icon: "🐢" },
-            { name: "風雷鳥", icon: "🦅" }
+            { name: "風雷鳥", icon: "🦅" },
+            { name: "暗影狼", icon: "🐺" }
         ];
         let myMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
 
         document.getElementById("monster-name").innerText = myMonster.name;
         document.getElementById("monster-icon").innerText = myMonster.icon;
 
+        // 每秒輪詢一次 (加入時間戳防止快取)
         setInterval(fetchGameState, 1000);
 
         function fetchGameState() {
-            fetch(`${FIREBASE_BASE_URL}/state.json`)
+            fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(state => {
                     if (state) state = state.replace(/"/g, '');
                     if (state && state !== currentState) {
                         currentState = state;
-                        switchScreen(currentState);
+                        updateScreen();
                     }
-                }).catch(err => { });
+                }).catch(err => console.log("等待連線...", err));
         }
 
-        function switchScreen(stateId) {
+        function updateScreen() {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            const targetScreen = document.getElementById('screen-' + stateId.replace('_', '-')) || document.getElementById('screen-waiting');
-            targetScreen.classList.add('active');
+
+            if (currentState === "battle") {
+                if (!hasSummoned) document.getElementById('screen-battle-summon').classList.add('active');
+                else document.getElementById('screen-battle-control').classList.add('active');
+            }
+            else {
+                const targetScreen = document.getElementById('screen-' + currentState.replace('_', '-')) || document.getElementById('screen-waiting');
+                targetScreen.classList.add('active');
+            }
         }
 
-        // --- 召喚功能 ---
         function summonMonster() {
-            if (hasSummoned) return;
             hasSummoned = true;
 
-            document.getElementById("btn-summon").style.display = "none";
-            document.getElementById("summon-card").style.display = "none";
-            document.getElementById("battle-title").innerText = "🕹️ 操控你的怪獸";
-            document.getElementById("joystick-area").style.display = "block"; // 顯示搖桿
-
-            const payload = {};
-            payload[userId] = myMonster.name;
+            // 寫入 spawn
+            const payload = {}; payload[userId] = myMonster.name;
             fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+            // 預設發送 Free 指令
+            sendCommand("Free");
+            updateScreen();
         }
 
-        // --- 虛擬搖桿功能 ---
-        const joyArea = document.getElementById("joystick-area");
-        const joyKnob = document.getElementById("joystick-knob");
-        let joyActive = false;
-        let joyData = { x: 0, y: 0 };
-        let lastSentData = { x: 0, y: 0 };
+        function sendCommand(cmdName) {
+            // UI 視覺更新
+            document.querySelectorAll('.cmd-btn').forEach(btn => btn.classList.remove('active-cmd'));
+            const activeBtn = document.getElementById('cmd-' + cmdName);
+            if (activeBtn) activeBtn.classList.add('active-cmd');
 
-        joyArea.addEventListener("pointerdown", startJoy);
-        joyArea.addEventListener("pointermove", moveJoy);
-        window.addEventListener("pointerup", endJoy);
-
-        function startJoy(e) { joyActive = true; moveJoy(e); }
-        function endJoy(e) {
-            joyActive = false;
-            joyKnob.style.transform = `translate(0px, 0px)`;
-            joyData = { x: 0, y: 0 };
-            sendJoystickData(); // 歸零
-        }
-        function moveJoy(e) {
-            if (!joyActive) return;
-            const rect = joyArea.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-
-            let dx = e.clientX - centerX;
-            let dy = e.clientY - centerY;
-            const maxRadius = 60;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance > maxRadius) {
-                dx = (dx / distance) * maxRadius;
-                dy = (dy / distance) * maxRadius;
-            }
-
-            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-
-            // 轉換為 -1.0 到 1.0 之間
-            joyData.x = (dx / maxRadius).toFixed(2);
-            joyData.y = -(dy / maxRadius).toFixed(2); // 反轉 Y 軸適應 Unity
+            // 傳給 Unity
+            const payload = {}; payload[userId] = cmdName;
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
         }
 
-        // 每 150 毫秒傳送一次搖桿數據 (避免過度請求 Firebase)
-        setInterval(() => {
-            if (hasSummoned && currentState === "battle") {
-                if (joyData.x !== lastSentData.x || joyData.y !== lastSentData.y) {
-                    sendJoystickData();
-                    lastSentData.x = joyData.x;
-                    lastSentData.y = joyData.y;
-                }
-            }
-        }, 150);
-
-        function sendJoystickData() {
-            const payload = {};
-            payload[userId] = `${joyData.x},${joyData.y}`;
-            fetch(`${FIREBASE_BASE_URL}/joysticks.json`, { method: 'PATCH', body: JSON.stringify(payload) });
-        }
-
-        // --- 封印連打功能 ---
+        // 封印連打邏輯
         let taps = 0;
         let isUploadingTaps = false;
         function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
+
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
         setInterval(() => {
             if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
                 isUploadingTaps = true;
-                const payload = {};
-                payload[userId] = taps;
+                const payload = {}; payload[userId] = taps;
                 fetch(`${FIREBASE_BASE_URL}/taps.json`, { method: 'PATCH', body: JSON.stringify(payload) })
                     .then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
             }
