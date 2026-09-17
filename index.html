@@ -114,33 +114,46 @@
                 cursor: not-allowed;
             }
 
-        /* 狀態 3：封印 QTE */
+        /* 狀態 3 & 4：封印 QTE 雙手連打 */
         #tapCount {
-            font-size: 48px;
+            font-size: 56px;
             font-weight: bold;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             color: #ff00ff;
+            text-shadow: 0 0 15px #ff00ff;
         }
 
-        #tapButton {
-            width: 70vw;
-            height: 70vw;
-            max-width: 250px;
-            max-height: 250px;
-            border-radius: 50%;
-            background: radial-gradient(circle, #ff3b30, #990000);
-            border: 8px solid #ff9999;
-            box-shadow: 0 0 40px #ff3b30;
-            font-size: 32px;
+        .tap-container {
+            display: flex;
+            width: 90vw;
+            height: 50vh;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .tap-zone {
+            flex: 1;
+            border-radius: 20px;
+            background: rgba(255, 59, 48, 0.15);
+            border: 4px solid #ff3b30;
+            color: #fff;
+            font-size: 28px;
             font-weight: bold;
-            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
+            transition: 0.05s;
+            box-shadow: inset 0 0 20px rgba(255, 59, 48, 0.5);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
         }
 
-            #tapButton:active {
-                transform: scale(0.92);
-                background: radial-gradient(circle, #cc0000, #660000);
-                box-shadow: 0 0 60px #ff3b30;
+            .tap-zone:active {
+                background: rgba(255, 59, 48, 0.6);
+                transform: scale(0.96);
+                box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
 
         .pulse {
@@ -187,16 +200,19 @@
         <p>請活動你的手指，準備瘋狂點擊！</p>
     </div>
 
-    <!-- 畫面 4：瘋狂封印 -->
+    <!-- 畫面 4：瘋狂封印 (雙手連打版) -->
     <div id="screen-sealing" class="screen">
         <h1>緊急封印中！</h1>
         <div id="tapCount">0 下</div>
-        <button id="tapButton">點擊封印</button>
+        <div class="tap-container">
+            <div class="tap-zone" id="tapLeft">👈<br>左手<br>狂點</div>
+            <div class="tap-zone" id="tapRight">👉<br>右手<br>狂點</div>
+        </div>
     </div>
 
     <script>
-        // ⚠️⚠️⚠️ 替換成你的 Firebase URL (不要加上 .json，只要到 coop_session 結束) ⚠️⚠️⚠️
-        const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/";
+        // ⚠️ 已修正為帶有 /coop_session 的正確路徑 (不加 .json)
+        const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
 
         const userId = "user_" + Math.floor(Math.random() * 1000000);
         let currentState = "waiting";
@@ -258,14 +274,18 @@
             });
         }
 
-        // --- 瘋狂點擊封印功能 ---
+        // --- 瘋狂點擊封印功能 (雙按鈕) ---
         let taps = 0;
         let isUploadingTaps = false;
 
-        document.getElementById("tapButton").addEventListener("pointerdown", () => {
+        function registerTap() {
             taps++;
             document.getElementById("tapCount").innerText = taps + " 下";
-        });
+        }
+
+        // 綁定左右兩邊的點擊事件 (pointerdown 支援滑鼠與手機觸控，且沒有延遲)
+        document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
+        document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
         setInterval(() => {
             if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
