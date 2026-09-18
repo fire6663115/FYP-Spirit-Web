@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 禁止瀏覽器快取，確保拿到最新版 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>FYP 協同作戰系統</title>
     <style>
         * {
@@ -189,20 +193,24 @@
                 box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
 
-        /* 實時 Debug 監控台 */
-        #debug-log {
+        /* 增強版 Debug 面板 */
+        #debug-panel {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            font-size: 12px;
-            color: rgba(255,255,255,0.5);
-            text-align: left;
+            bottom: 5px;
+            left: 5px;
+            font-size: 11px;
+            color: #0f0;
+            background: rgba(0,0,0,0.8);
+            padding: 5px;
+            border-radius: 5px;
+            max-width: 95vw;
+            word-wrap: break-word;
             z-index: 999;
         }
     </style>
 </head>
 <body>
-    <div id="debug-log">Debug: 系統初始化...</div>
+    <div id="debug-panel">系統啟動中...</div>
 
     <div id="screen-waiting" class="screen active">
         <div class="loader"></div>
@@ -253,40 +261,54 @@
         let myMonsterName = "神秘怪獸";
         let isPoolLoaded = false;
 
-        const debugLog = document.getElementById("debug-log");
-        function log(msg) { debugLog.innerText = `UID: ${userId} | ${msg}`; }
+        const debugLog = document.getElementById("debug-panel");
+        let fetchCount = 0;
 
-        setInterval(fetchGameState, 1000);
+        function log(msg, isError = false) {
+            const color = isError ? '#ff4444' : '#00ff00';
+            debugLog.innerHTML = `<span style="color:${color}">[${fetchCount}] ${msg}</span>`;
+        }
 
-        function fetchGameState() {
-            // 同步卡池
-            if (!isPoolLoaded) {
-                fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`)
-                    .then(res => res.json())
-                    .then(pool => {
-                        if (pool && pool.length > 0) {
-                            myMonsterName = pool[Math.floor(Math.random() * pool.length)];
-                            document.getElementById("monster-name").innerText = myMonsterName;
-                            isPoolLoaded = true;
-                            log(`卡池載入成功 (${pool.length}隻)`);
-                        }
-                    }).catch(err => log("卡池下載失敗"));
-            }
+        // 先執行一次，再設間隔
+        fetchGameState();
+        setInterval(fetchGameState, 1500);
 
-            // 同步遊戲狀態
-            fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`)
-                .then(res => res.json())
-                .then(state => {
-                    // 安全字串轉換
-                    let cleanState = state ? String(state).replace(/"/g, '') : "waiting";
-                    log(`目前狀態: [${cleanState}] | 卡池: ${isPoolLoaded}`);
+        async function fetchGameState() {
+            fetchCount++;
+            try {
+                // 1. 同步卡池 (加入 catch 防止單點崩潰)
+                if (!isPoolLoaded) {
+                    const poolRes = await fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`);
+                    if (!poolRes.ok) throw new Error(`Pool HTTP: ${poolRes.status}`);
+                    const poolData = await poolRes.json();
 
-                    if (cleanState !== currentState) {
-                        if (cleanState === "waiting") { hasSummoned = false; isPoolLoaded = false; }
-                        currentState = cleanState;
-                        updateScreen();
+                    if (Array.isArray(poolData) && poolData.length > 0) {
+                        myMonsterName = poolData[Math.floor(Math.random() * poolData.length)];
+                        document.getElementById("monster-name").innerText = myMonsterName;
+                        isPoolLoaded = true;
+                    } else if (poolData !== null) {
+                        log("卡池格式錯誤: " + JSON.stringify(poolData).substring(0, 20), true);
                     }
-                }).catch(err => log("無法連線至 Firebase"));
+                }
+
+                // 2. 同步狀態
+                const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
+                if (!stateRes.ok) throw new Error(`State HTTP: ${stateRes.status}`);
+                const stateData = await stateRes.json();
+
+                let cleanState = stateData ? String(stateData).replace(/"/g, '') : "waiting";
+                log(`UID: ${userId} | 狀態: ${cleanState} | 卡池: ${isPoolLoaded}`);
+
+                if (cleanState !== currentState) {
+                    if (cleanState === "waiting") { hasSummoned = false; isPoolLoaded = false; }
+                    currentState = cleanState;
+                    updateScreen();
+                }
+
+            } catch (err) {
+                log(`網路錯誤: ${err.message}`, true);
+                console.error("Fetch Error:", err);
+            }
         }
 
         function updateScreen() {
@@ -300,15 +322,20 @@
             }
         }
 
-        function summonMonster() {
-            if (!isPoolLoaded) { alert("主機資料同步中，請稍候！"); return; }
+        async function summonMonster() {
+            if (!isPoolLoaded) { alert("主機尚未上傳卡池，請確認 Unity 是否有報錯！"); return; }
             hasSummoned = true;
-            const payload = {}; payload[userId] = myMonsterName;
-            fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) })
-                .then(() => log("召喚請求已發送"))
-                .catch(err => log("召喚發送失敗"));
-            sendCommand("Free");
-            updateScreen();
+            try {
+                const payload = {}; payload[userId] = myMonsterName;
+                await fetch(`${FIREBASE_BASE_URL}/spawns.json`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+                sendCommand("Free");
+                updateScreen();
+            } catch (err) {
+                log("召喚失敗", true);
+            }
         }
 
         function sendCommand(cmdName) {
@@ -317,7 +344,7 @@
             if (activeBtn) activeBtn.classList.add('active-cmd');
 
             const payload = {}; payload[userId] = cmdName;
-            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => { });
         }
 
         let taps = 0;
