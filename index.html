@@ -90,7 +90,6 @@
             margin: 10px 0;
         }
 
-        /* 血量條 UI */
         .hp-container {
             width: 100%;
             background: #333;
@@ -229,6 +228,12 @@
         <p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p>
     </div>
 
+    <!-- 觀戰畫面 (房間已滿) -->
+    <div id="screen-spectator" class="screen">
+        <h1 style="color:#aaaaaa">👁️ 觀戰模式</h1>
+        <p>連線房間已達 5 人上限！<br>請在場外為其他支援玩家加油。</p>
+    </div>
+
     <div id="screen-battle-summon" class="screen">
         <h1>⚔️ 戰鬥已開始！</h1>
         <p>點擊按鈕，讓怪獸空降戰場：</p>
@@ -277,13 +282,11 @@
         let isPoolLoaded = false;
         let currentHp = 100;
 
-        // 【優化】提速：每 500 毫秒 (0.5秒) 同步一次，手感大幅提升！
         fetchGameState();
         setInterval(fetchGameState, 500);
 
         async function fetchGameState() {
             try {
-                // 1. 同步卡池
                 if (!isPoolLoaded) {
                     const poolRes = await fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`);
                     const poolData = await poolRes.json();
@@ -294,30 +297,37 @@
                     }
                 }
 
-                // 2. 死亡與血量檢查
+                // 1. 優先檢查是否被分配為觀戰者 (房間已滿)
+                const specRes = await fetch(`${FIREBASE_BASE_URL}/spectators/${userId}.json?t=${new Date().getTime()}`);
+                const isSpectator = await specRes.json();
+                if (isSpectator === true) {
+                    currentState = "spectator";
+                    updateScreen();
+                    return; // 鎖在觀戰畫面
+                }
+
+                // 2. 檢查是否戰死
                 const deadRes = await fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`);
                 const isDead = await deadRes.json();
                 if (isDead === true) {
                     currentState = "dead";
                     updateScreen();
-                    return; // 如果死了，強制鎖在死亡畫面，不往下執行
+                    return; // 鎖在陣亡畫面
                 }
 
+                // 3. 讀取血量
                 const hpRes = await fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`);
                 const hpData = await hpRes.json();
                 currentHp = hpData !== null ? parseFloat(hpData) : 100;
                 updateHpUI();
 
-                // 3. 同步狀態
+                // 4. 同步遊戲狀態
                 const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
                 let cleanState = (await stateRes.json()) || "waiting";
                 cleanState = String(cleanState).replace(/"/g, '');
 
                 if (cleanState !== currentState) {
-                    // 【重點】波次結束或剛開始時，重置召喚權，允許再次派兵
-                    if (cleanState === "waiting" || cleanState === "moving") {
-                        hasSummoned = false;
-                    }
+                    if (cleanState === "waiting" || cleanState === "moving") { hasSummoned = false; }
                     currentState = cleanState;
                     updateScreen();
                 }
@@ -327,7 +337,6 @@
         function updateHpUI() {
             document.getElementById("summon-hp-text").innerText = currentHp.toFixed(1);
             document.getElementById("ctrl-hp-text").innerText = currentHp.toFixed(1);
-
             const bars = [document.getElementById("summon-hp-bar"), document.getElementById("ctrl-hp-bar")];
             bars.forEach(bar => {
                 bar.style.width = `${currentHp}%`;
