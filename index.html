@@ -33,6 +33,7 @@
             height: 100%;
             text-align: center;
             padding: 20px;
+            position: relative;
         }
 
             .screen.active {
@@ -138,6 +139,7 @@
             width: 90vw;
             max-width: 400px;
             margin-top: 20px;
+            margin-bottom: 80px;
         }
 
         .cmd-btn {
@@ -168,17 +170,47 @@
             }
 
         .ult-btn {
-            grid-column: span 1;
+            grid-column: span 2;
             background: linear-gradient(90deg, #ff3366, #cc0033);
             border: 2px solid #ff9999;
             box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
         }
 
-        .recall-btn {
-            grid-column: span 1;
-            background: linear-gradient(90deg, #3366ff, #0033cc);
-            border: 2px solid #99b3ff;
-            box-shadow: 0 0 20px rgba(51, 102, 255, 0.5);
+        /* 圓形召回按鈕 (懸浮於底部) */
+        .recall-fab {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3366ff, #0033cc);
+            border: 3px solid #99b3ff;
+            box-shadow: 0 0 25px rgba(51, 102, 255, 0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            transition: transform 0.1s;
+        }
+
+            .recall-fab:active {
+                transform: translateX(-50%) scale(0.9);
+                background: #002299;
+            }
+
+        .recall-icon {
+            font-size: 24px;
+            margin-bottom: -2px;
+        }
+
+        .recall-text {
+            font-size: 14px;
+            font-weight: bold;
         }
 
         #tapCount {
@@ -223,18 +255,15 @@
         <div class="loader"></div><h1>等待主機...</h1><p>等待主機進入關卡</p>
     </div>
 
-    <!-- 轉場畫面 -->
     <div id="screen-moving" class="screen">
         <div class="loader" style="border-top-color: #ffcc00;"></div><h1 style="color:#ffcc00">🏃 區域淨空</h1>
         <p>本波次結束！請等待抵達下一戰區。</p>
     </div>
 
-    <!-- 陣亡畫面 -->
     <div id="screen-dead" class="screen">
         <h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p>
     </div>
 
-    <!-- 觀戰畫面 -->
     <div id="screen-spectator" class="screen">
         <h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p>
     </div>
@@ -256,7 +285,6 @@
             <div class="hp-container"><div class="hp-bar" id="summon-hp-bar"></div></div>
             <div class="hp-text">狀態: <span id="summon-hp-text">100</span>%</div>
         </div>
-        <!-- 文字更改為「喚靈！」 -->
         <button class="btn-main" onclick="summonMonster()">喚靈！</button>
     </div>
 
@@ -270,8 +298,12 @@
             <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
             <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
             <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
-            <!-- 新增召回按鈕 -->
-            <div class="cmd-btn recall-btn" onclick="recallMonster()">🔙 召回</div>
+        </div>
+
+        <!-- 獨立的圓形召回按鈕 -->
+        <div class="recall-fab" onclick="recallMonster()">
+            <div class="recall-icon">🔙</div>
+            <div class="recall-text">召回</div>
         </div>
     </div>
 
@@ -309,7 +341,6 @@
                 const deadRes = await fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`);
                 if (await deadRes.json() === true) { currentState = "dead"; updateScreen(); return; }
 
-                // 實時讀取血量 (Unity 現在會一直更新這個值)
                 const hpRes = await fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`);
                 const hpData = await hpRes.json();
                 if (hpData !== null) {
@@ -321,14 +352,11 @@
                 let cleanState = (await stateRes.json()) || "waiting";
                 cleanState = String(cleanState).replace(/"/g, '');
 
-                // 狀態切換邏輯
                 if (cleanState !== currentState) {
                     if (cleanState === "waiting" || cleanState === "moving") {
                         hasSummoned = false;
-                        if (cooldownTimer) clearInterval(cooldownTimer); // 打斷冷卻，直接進入下一波
+                        if (cooldownTimer) clearInterval(cooldownTimer);
                     }
-
-                    // 只有當前不是在「召回冷卻中」，才允許被伺服器的戰鬥狀態覆蓋
                     if (!(currentState === "cooldown" && cleanState === "battle")) {
                         currentState = cleanState;
                     }
@@ -369,13 +397,14 @@
             } catch (err) { }
         }
 
-        // 召回機制
         function recallMonster() {
-            // 發送召回指令給 Unity
+            // 1. 發送召回指令
             const payload = {}; payload[userId] = "Recall";
             fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
 
-            // 進入 10 秒冷卻
+            // 2. 【防閃爍關鍵】主動刪除雲端的召喚紀錄，避免 Unity 誤判重新生成
+            fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json`, { method: 'DELETE' });
+
             hasSummoned = false;
             currentState = "cooldown";
             updateScreen();
