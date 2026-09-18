@@ -188,18 +188,28 @@
                 transform: scale(0.96);
                 box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
+
+        /* 實時 Debug 監控台 */
+        #debug-log {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            text-align: left;
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
+    <div id="debug-log">Debug: 系統初始化...</div>
 
-    <!-- 畫面 1：等待 -->
     <div id="screen-waiting" class="screen active">
         <div class="loader"></div>
         <h1>等待主機開始遊戲...</h1>
         <p>連線準備中</p>
     </div>
 
-    <!-- 畫面 2：抽卡召喚 -->
     <div id="screen-battle-summon" class="screen">
         <h1>⚔️ 戰鬥已開始！</h1>
         <p>你抽到的支援怪獸是：</p>
@@ -210,10 +220,8 @@
         <button class="btn-main" id="summonBtn" onclick="summonMonster()">召喚支援！</button>
     </div>
 
-    <!-- 畫面 2.5：怪獸控制台 -->
     <div id="screen-battle-control" class="screen">
         <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
-        <p>你的怪獸已加入戰場，請下達指令！</p>
         <div class="control-grid">
             <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
             <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
@@ -223,13 +231,11 @@
         </div>
     </div>
 
-    <!-- 畫面 3：警告 -->
     <div id="screen-sealing-prep" class="screen">
         <h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1>
         <h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2>
     </div>
 
-    <!-- 畫面 4：封印雙打 -->
     <div id="screen-sealing" class="screen">
         <h1>緊急封印中！</h1>
         <div id="tapCount">0 下</div>
@@ -240,18 +246,20 @@
     </div>
 
     <script>
-        // ✅ 終極校正：確保網址包含 /coop_session，與 Unity 完美對齊
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
-        const userId = "user_" + Math.floor(Math.random() * 1000000);
-
-        let currentState = "waiting";
+        const userId = "user_" + Math.floor(Math.random() * 10000);
+        let currentState = "unknown";
         let hasSummoned = false;
         let myMonsterName = "神秘怪獸";
         let isPoolLoaded = false;
 
+        const debugLog = document.getElementById("debug-log");
+        function log(msg) { debugLog.innerText = `UID: ${userId} | ${msg}`; }
+
         setInterval(fetchGameState, 1000);
 
         function fetchGameState() {
+            // 同步卡池
             if (!isPoolLoaded) {
                 fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`)
                     .then(res => res.json())
@@ -260,46 +268,45 @@
                             myMonsterName = pool[Math.floor(Math.random() * pool.length)];
                             document.getElementById("monster-name").innerText = myMonsterName;
                             isPoolLoaded = true;
+                            log(`卡池載入成功 (${pool.length}隻)`);
                         }
-                    }).catch(err => console.log("等待卡池同步..."));
+                    }).catch(err => log("卡池下載失敗"));
             }
 
+            // 同步遊戲狀態
             fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(state => {
-                    if (state) state = state.replace(/"/g, '');
-                    if (state && state !== currentState) {
-                        if (state === "waiting") {
-                            hasSummoned = false;
-                            isPoolLoaded = false;
-                        }
-                        currentState = state;
+                    // 安全字串轉換
+                    let cleanState = state ? String(state).replace(/"/g, '') : "waiting";
+                    log(`目前狀態: [${cleanState}] | 卡池: ${isPoolLoaded}`);
+
+                    if (cleanState !== currentState) {
+                        if (cleanState === "waiting") { hasSummoned = false; isPoolLoaded = false; }
+                        currentState = cleanState;
                         updateScreen();
                     }
-                }).catch(err => console.log("等待主機連線..."));
+                }).catch(err => log("無法連線至 Firebase"));
         }
 
         function updateScreen() {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-
             if (currentState === "battle") {
                 if (!hasSummoned) document.getElementById('screen-battle-summon').classList.add('active');
                 else document.getElementById('screen-battle-control').classList.add('active');
-            }
-            else {
+            } else {
                 const targetScreen = document.getElementById('screen-' + currentState.replace('_', '-')) || document.getElementById('screen-waiting');
                 targetScreen.classList.add('active');
             }
         }
 
         function summonMonster() {
-            if (!isPoolLoaded) {
-                alert("主機資料同步中，請稍候再試！");
-                return;
-            }
+            if (!isPoolLoaded) { alert("主機資料同步中，請稍候！"); return; }
             hasSummoned = true;
             const payload = {}; payload[userId] = myMonsterName;
-            fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+            fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) })
+                .then(() => log("召喚請求已發送"))
+                .catch(err => log("召喚發送失敗"));
             sendCommand("Free");
             updateScreen();
         }
@@ -316,7 +323,6 @@
         let taps = 0;
         let isUploadingTaps = false;
         function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
-
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
