@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- 禁止瀏覽器快取，確保拿到最新版 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <title>FYP 協同作戰系統</title>
     <style>
         * {
@@ -52,6 +49,7 @@
         p {
             margin-top: 0;
             color: #ccc;
+            font-size: 18px;
         }
 
         .loader {
@@ -78,7 +76,7 @@
             background: linear-gradient(135deg, #443366, #221144);
             border: 2px solid #aa88ff;
             border-radius: 15px;
-            padding: 30px 20px;
+            padding: 20px;
             margin: 20px 0;
             width: 80%;
             max-width: 300px;
@@ -90,6 +88,30 @@
             font-weight: bold;
             color: #fff;
             margin: 10px 0;
+        }
+
+        /* 血量條 UI */
+        .hp-container {
+            width: 100%;
+            background: #333;
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+            border: 2px solid #555;
+        }
+
+        .hp-bar {
+            height: 15px;
+            background: #00ff00;
+            width: 100%;
+            transition: width 0.3s, background 0.3s;
+        }
+
+        .hp-text {
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 5px;
+            color: #fff;
         }
 
         .btn-main {
@@ -152,10 +174,6 @@
             box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
         }
 
-            .ult-btn:active {
-                background: #990000;
-            }
-
         #tapCount {
             font-size: 56px;
             font-weight: bold;
@@ -183,7 +201,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
             touch-action: manipulation;
         }
 
@@ -192,50 +209,48 @@
                 transform: scale(0.96);
                 box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
             }
-
-        /* 增強版 Debug 面板 */
-        #debug-panel {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            font-size: 11px;
-            color: #0f0;
-            background: rgba(0,0,0,0.8);
-            padding: 5px;
-            border-radius: 5px;
-            max-width: 95vw;
-            word-wrap: break-word;
-            z-index: 999;
-        }
     </style>
 </head>
 <body>
-    <div id="debug-panel">系統啟動中...</div>
-
     <div id="screen-waiting" class="screen active">
-        <div class="loader"></div>
-        <h1>等待主機開始遊戲...</h1>
-        <p>連線準備中</p>
+        <div class="loader"></div><h1>等待主機...</h1><p>連線準備中</p>
+    </div>
+
+    <!-- 轉場畫面 -->
+    <div id="screen-moving" class="screen">
+        <div class="loader" style="border-top-color: #ffcc00;"></div>
+        <h1 style="color:#ffcc00">🏃 區域淨空</h1>
+        <p>本波次結束！請等待抵達下一戰區，<br>即可再次召喚怪獸。</p>
+    </div>
+
+    <!-- 陣亡畫面 -->
+    <div id="screen-dead" class="screen">
+        <h1 style="color:#ff3333">💀 戰死沙場</h1>
+        <p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p>
     </div>
 
     <div id="screen-battle-summon" class="screen">
         <h1>⚔️ 戰鬥已開始！</h1>
-        <p>你抽到的支援怪獸是：</p>
+        <p>點擊按鈕，讓怪獸空降戰場：</p>
         <div class="card">
             <div style="font-size: 40px;" id="monster-icon">🔮</div>
             <div class="monster-name" id="monster-name">載入中...</div>
+            <div class="hp-container"><div class="hp-bar" id="summon-hp-bar"></div></div>
+            <div class="hp-text">剩餘血量: <span id="summon-hp-text">100</span>%</div>
         </div>
-        <button class="btn-main" id="summonBtn" onclick="summonMonster()">召喚支援！</button>
+        <button class="btn-main" onclick="summonMonster()">召喚空降！</button>
     </div>
 
     <div id="screen-battle-control" class="screen">
         <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
+        <div class="hp-container" style="width: 80%; max-width:300px;"><div class="hp-bar" id="ctrl-hp-bar"></div></div>
+        <div class="hp-text" style="margin-bottom:15px;">血量: <span id="ctrl-hp-text">100</span>%</div>
         <div class="control-grid">
             <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
             <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
             <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
             <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
-            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 釋放終極大招！</div>
+            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 釋放大招！</div>
         </div>
     </div>
 
@@ -260,55 +275,64 @@
         let hasSummoned = false;
         let myMonsterName = "神秘怪獸";
         let isPoolLoaded = false;
+        let currentHp = 100;
 
-        const debugLog = document.getElementById("debug-panel");
-        let fetchCount = 0;
-
-        function log(msg, isError = false) {
-            const color = isError ? '#ff4444' : '#00ff00';
-            debugLog.innerHTML = `<span style="color:${color}">[${fetchCount}] ${msg}</span>`;
-        }
-
-        // 先執行一次，再設間隔
+        // 【優化】提速：每 500 毫秒 (0.5秒) 同步一次，手感大幅提升！
         fetchGameState();
-        setInterval(fetchGameState, 1500);
+        setInterval(fetchGameState, 500);
 
         async function fetchGameState() {
-            fetchCount++;
             try {
-                // 1. 同步卡池 (加入 catch 防止單點崩潰)
+                // 1. 同步卡池
                 if (!isPoolLoaded) {
                     const poolRes = await fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`);
-                    if (!poolRes.ok) throw new Error(`Pool HTTP: ${poolRes.status}`);
                     const poolData = await poolRes.json();
-
                     if (Array.isArray(poolData) && poolData.length > 0) {
                         myMonsterName = poolData[Math.floor(Math.random() * poolData.length)];
                         document.getElementById("monster-name").innerText = myMonsterName;
                         isPoolLoaded = true;
-                    } else if (poolData !== null) {
-                        log("卡池格式錯誤: " + JSON.stringify(poolData).substring(0, 20), true);
                     }
                 }
 
-                // 2. 同步狀態
-                const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
-                if (!stateRes.ok) throw new Error(`State HTTP: ${stateRes.status}`);
-                const stateData = await stateRes.json();
+                // 2. 死亡與血量檢查
+                const deadRes = await fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`);
+                const isDead = await deadRes.json();
+                if (isDead === true) {
+                    currentState = "dead";
+                    updateScreen();
+                    return; // 如果死了，強制鎖在死亡畫面，不往下執行
+                }
 
-                let cleanState = stateData ? String(stateData).replace(/"/g, '') : "waiting";
-                log(`UID: ${userId} | 狀態: ${cleanState} | 卡池: ${isPoolLoaded}`);
+                const hpRes = await fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`);
+                const hpData = await hpRes.json();
+                currentHp = hpData !== null ? parseFloat(hpData) : 100;
+                updateHpUI();
+
+                // 3. 同步狀態
+                const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
+                let cleanState = (await stateRes.json()) || "waiting";
+                cleanState = String(cleanState).replace(/"/g, '');
 
                 if (cleanState !== currentState) {
-                    if (cleanState === "waiting") { hasSummoned = false; isPoolLoaded = false; }
+                    // 【重點】波次結束或剛開始時，重置召喚權，允許再次派兵
+                    if (cleanState === "waiting" || cleanState === "moving") {
+                        hasSummoned = false;
+                    }
                     currentState = cleanState;
                     updateScreen();
                 }
+            } catch (err) { }
+        }
 
-            } catch (err) {
-                log(`網路錯誤: ${err.message}`, true);
-                console.error("Fetch Error:", err);
-            }
+        function updateHpUI() {
+            document.getElementById("summon-hp-text").innerText = currentHp.toFixed(1);
+            document.getElementById("ctrl-hp-text").innerText = currentHp.toFixed(1);
+
+            const bars = [document.getElementById("summon-hp-bar"), document.getElementById("ctrl-hp-bar")];
+            bars.forEach(bar => {
+                bar.style.width = `${currentHp}%`;
+                bar.style.background = currentHp > 50 ? "#00ff00" : (currentHp > 20 ? "#ffcc00" : "#ff3333");
+            });
         }
 
         function updateScreen() {
@@ -323,19 +347,14 @@
         }
 
         async function summonMonster() {
-            if (!isPoolLoaded) { alert("主機尚未上傳卡池，請確認 Unity 是否有報錯！"); return; }
+            if (!isPoolLoaded) return;
             hasSummoned = true;
             try {
                 const payload = {}; payload[userId] = myMonsterName;
-                await fetch(`${FIREBASE_BASE_URL}/spawns.json`, {
-                    method: 'PATCH',
-                    body: JSON.stringify(payload)
-                });
+                await fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
                 sendCommand("Free");
                 updateScreen();
-            } catch (err) {
-                log("召喚失敗", true);
-            }
+            } catch (err) { }
         }
 
         function sendCommand(cmdName) {
@@ -347,8 +366,7 @@
             fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => { });
         }
 
-        let taps = 0;
-        let isUploadingTaps = false;
+        let taps = 0, isUploadingTaps = false;
         function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
