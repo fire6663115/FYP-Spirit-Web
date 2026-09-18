@@ -240,6 +240,7 @@
     </div>
 
     <script>
+        // ✅ 終極校正：確保網址包含 /coop_session，與 Unity 完美對齊
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
         const userId = "user_" + Math.floor(Math.random() * 1000000);
 
@@ -248,11 +249,9 @@
         let myMonsterName = "神秘怪獸";
         let isPoolLoaded = false;
 
-        // 每秒輪詢一次狀態與卡池
         setInterval(fetchGameState, 1000);
 
         function fetchGameState() {
-            // 1. 同步卡池 (只需獲取一次)
             if (!isPoolLoaded) {
                 fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`)
                     .then(res => res.json())
@@ -265,13 +264,11 @@
                     }).catch(err => console.log("等待卡池同步..."));
             }
 
-            // 2. 同步遊戲狀態
             fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(state => {
                     if (state) state = state.replace(/"/g, '');
                     if (state && state !== currentState) {
-                        // 如果狀態是 waiting，重置召喚狀態 (對應新的一局)
                         if (state === "waiting") {
                             hasSummoned = false;
                             isPoolLoaded = false;
@@ -297,7 +294,7 @@
 
         function summonMonster() {
             if (!isPoolLoaded) {
-                alert("卡池尚未同步，請稍候！");
+                alert("主機資料同步中，請稍候再試！");
                 return;
             }
             hasSummoned = true;
