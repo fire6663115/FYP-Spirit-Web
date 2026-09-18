@@ -214,7 +214,7 @@
         <button class="btn-main" onclick="summonMonster()">召喚支援！</button>
     </div>
 
-    <!-- 畫面 2.5：怪獸控制台 (召喚後顯示) -->
+    <!-- 畫面 2.5：怪獸控制台 -->
     <div id="screen-battle-control" class="screen">
         <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
         <p>你的怪獸已加入戰場，請下達指令！</p>
@@ -244,14 +244,14 @@
     </div>
 
     <script>
-        const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
+        // ⚠️ 已修正為與你 Unity 匹配的根目錄網址
+        const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com";
         const userId = "user_" + Math.floor(Math.random() * 1000000);
 
         let currentState = "waiting";
         let hasSummoned = false;
         let currentCommand = "Free";
 
-        // 與 Unity 配置對齊的卡池 (名字必須與 Unity 裡的 MonsterData 名字一致！)
         const monsterPool = [
             { name: "烈焰龍", icon: "🐉" },
             { name: "水岩獸", icon: "🐢" },
@@ -263,7 +263,7 @@
         document.getElementById("monster-name").innerText = myMonster.name;
         document.getElementById("monster-icon").innerText = myMonster.icon;
 
-        // 每秒輪詢一次 (加入時間戳防止快取)
+        // 加入時間戳防止瀏覽器快取作祟
         setInterval(fetchGameState, 1000);
 
         function fetchGameState() {
@@ -293,28 +293,21 @@
 
         function summonMonster() {
             hasSummoned = true;
-
-            // 寫入 spawn
             const payload = {}; payload[userId] = myMonster.name;
             fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
-
-            // 預設發送 Free 指令
             sendCommand("Free");
             updateScreen();
         }
 
         function sendCommand(cmdName) {
-            // UI 視覺更新
             document.querySelectorAll('.cmd-btn').forEach(btn => btn.classList.remove('active-cmd'));
             const activeBtn = document.getElementById('cmd-' + cmdName);
             if (activeBtn) activeBtn.classList.add('active-cmd');
 
-            // 傳給 Unity
             const payload = {}; payload[userId] = cmdName;
             fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
         }
 
-        // 封印連打邏輯
         let taps = 0;
         let isUploadingTaps = false;
         function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
