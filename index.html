@@ -90,6 +90,7 @@
             margin: 10px 0;
         }
 
+        /* 血量條 UI */
         .hp-container {
             width: 100%;
             background: #333;
@@ -167,10 +168,17 @@
             }
 
         .ult-btn {
-            grid-column: span 2;
+            grid-column: span 1;
             background: linear-gradient(90deg, #ff3366, #cc0033);
             border: 2px solid #ff9999;
             box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+        }
+
+        .recall-btn {
+            grid-column: span 1;
+            background: linear-gradient(90deg, #3366ff, #0033cc);
+            border: 2px solid #99b3ff;
+            box-shadow: 0 0 20px rgba(51, 102, 255, 0.5);
         }
 
         #tapCount {
@@ -212,66 +220,63 @@
 </head>
 <body>
     <div id="screen-waiting" class="screen active">
-        <div class="loader"></div><h1>等待主機...</h1><p>連線準備中</p>
+        <div class="loader"></div><h1>等待主機...</h1><p>等待主機進入關卡</p>
     </div>
 
     <!-- 轉場畫面 -->
     <div id="screen-moving" class="screen">
-        <div class="loader" style="border-top-color: #ffcc00;"></div>
-        <h1 style="color:#ffcc00">🏃 區域淨空</h1>
-        <p>本波次結束！請等待抵達下一戰區，<br>即可再次召喚怪獸。</p>
+        <div class="loader" style="border-top-color: #ffcc00;"></div><h1 style="color:#ffcc00">🏃 區域淨空</h1>
+        <p>本波次結束！請等待抵達下一戰區。</p>
     </div>
 
     <!-- 陣亡畫面 -->
     <div id="screen-dead" class="screen">
-        <h1 style="color:#ff3333">💀 戰死沙場</h1>
-        <p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p>
+        <h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p>
     </div>
 
-    <!-- 觀戰畫面 (房間已滿) -->
+    <!-- 觀戰畫面 -->
     <div id="screen-spectator" class="screen">
-        <h1 style="color:#aaaaaa">👁️ 觀戰模式</h1>
-        <p>連線房間已達 5 人上限！<br>請在場外為其他支援玩家加油。</p>
+        <h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p>
+    </div>
+
+    <!-- 召回冷卻畫面 -->
+    <div id="screen-cooldown" class="screen">
+        <h1 style="color:#3366ff">🔙 召回休整中</h1>
+        <div class="loader" style="border-top-color: #3366ff; width:70px; height:70px; margin: 30px auto;"></div>
+        <p>怪獸正在重新凝聚靈力...</p>
+        <h2 style="font-size: 40px; color: #fff;"><span id="cd-text">10</span> 秒後可再次喚靈</h2>
     </div>
 
     <div id="screen-battle-summon" class="screen">
         <h1>⚔️ 戰鬥已開始！</h1>
-        <p>點擊按鈕，讓怪獸空降戰場：</p>
+        <p>戰況緊急，請立即支援：</p>
         <div class="card">
             <div style="font-size: 40px;" id="monster-icon">🔮</div>
             <div class="monster-name" id="monster-name">載入中...</div>
             <div class="hp-container"><div class="hp-bar" id="summon-hp-bar"></div></div>
-            <div class="hp-text">剩餘血量: <span id="summon-hp-text">100</span>%</div>
+            <div class="hp-text">狀態: <span id="summon-hp-text">100</span>%</div>
         </div>
-        <button class="btn-main" onclick="summonMonster()">召喚空降！</button>
+        <!-- 文字更改為「喚靈！」 -->
+        <button class="btn-main" onclick="summonMonster()">喚靈！</button>
     </div>
 
     <div id="screen-battle-control" class="screen">
         <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
         <div class="hp-container" style="width: 80%; max-width:300px;"><div class="hp-bar" id="ctrl-hp-bar"></div></div>
-        <div class="hp-text" style="margin-bottom:15px;">血量: <span id="ctrl-hp-text">100</span>%</div>
+        <div class="hp-text" style="margin-bottom:15px;">實時血量: <span id="ctrl-hp-text">100</span>%</div>
         <div class="control-grid">
             <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
             <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
             <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
             <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
-            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 釋放大招！</div>
+            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
+            <!-- 新增召回按鈕 -->
+            <div class="cmd-btn recall-btn" onclick="recallMonster()">🔙 召回</div>
         </div>
     </div>
 
-    <div id="screen-sealing-prep" class="screen">
-        <h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1>
-        <h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2>
-    </div>
-
-    <div id="screen-sealing" class="screen">
-        <h1>緊急封印中！</h1>
-        <div id="tapCount">0 下</div>
-        <div class="tap-container">
-            <div class="tap-zone" id="tapLeft">👈 左手狂點</div>
-            <div class="tap-zone" id="tapRight">右手狂點 👉</div>
-        </div>
-    </div>
+    <div id="screen-sealing-prep" class="screen"><h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1><h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2></div>
+    <div id="screen-sealing" class="screen"><h1>緊急封印中！</h1><div id="tapCount">0 下</div><div class="tap-container"><div class="tap-zone" id="tapLeft">👈 左手狂點</div><div class="tap-zone" id="tapRight">右手狂點 👉</div></div></div>
 
     <script>
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
@@ -281,6 +286,7 @@
         let myMonsterName = "神秘怪獸";
         let isPoolLoaded = false;
         let currentHp = 100;
+        let cooldownTimer = null;
 
         fetchGameState();
         setInterval(fetchGameState, 500);
@@ -297,38 +303,35 @@
                     }
                 }
 
-                // 1. 優先檢查是否被分配為觀戰者 (房間已滿)
                 const specRes = await fetch(`${FIREBASE_BASE_URL}/spectators/${userId}.json?t=${new Date().getTime()}`);
-                const isSpectator = await specRes.json();
-                if (isSpectator === true) {
-                    currentState = "spectator";
-                    updateScreen();
-                    return; // 鎖在觀戰畫面
-                }
+                if (await specRes.json() === true) { currentState = "spectator"; updateScreen(); return; }
 
-                // 2. 檢查是否戰死
                 const deadRes = await fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`);
-                const isDead = await deadRes.json();
-                if (isDead === true) {
-                    currentState = "dead";
-                    updateScreen();
-                    return; // 鎖在陣亡畫面
-                }
+                if (await deadRes.json() === true) { currentState = "dead"; updateScreen(); return; }
 
-                // 3. 讀取血量
+                // 實時讀取血量 (Unity 現在會一直更新這個值)
                 const hpRes = await fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`);
                 const hpData = await hpRes.json();
-                currentHp = hpData !== null ? parseFloat(hpData) : 100;
-                updateHpUI();
+                if (hpData !== null) {
+                    currentHp = parseFloat(hpData);
+                    updateHpUI();
+                }
 
-                // 4. 同步遊戲狀態
                 const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
                 let cleanState = (await stateRes.json()) || "waiting";
                 cleanState = String(cleanState).replace(/"/g, '');
 
+                // 狀態切換邏輯
                 if (cleanState !== currentState) {
-                    if (cleanState === "waiting" || cleanState === "moving") { hasSummoned = false; }
-                    currentState = cleanState;
+                    if (cleanState === "waiting" || cleanState === "moving") {
+                        hasSummoned = false;
+                        if (cooldownTimer) clearInterval(cooldownTimer); // 打斷冷卻，直接進入下一波
+                    }
+
+                    // 只有當前不是在「召回冷卻中」，才允許被伺服器的戰鬥狀態覆蓋
+                    if (!(currentState === "cooldown" && cleanState === "battle")) {
+                        currentState = cleanState;
+                    }
                     updateScreen();
                 }
             } catch (err) { }
@@ -364,6 +367,32 @@
                 sendCommand("Free");
                 updateScreen();
             } catch (err) { }
+        }
+
+        // 召回機制
+        function recallMonster() {
+            // 發送召回指令給 Unity
+            const payload = {}; payload[userId] = "Recall";
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+            // 進入 10 秒冷卻
+            hasSummoned = false;
+            currentState = "cooldown";
+            updateScreen();
+
+            let cdTime = 10;
+            document.getElementById("cd-text").innerText = cdTime;
+            cooldownTimer = setInterval(() => {
+                cdTime--;
+                document.getElementById("cd-text").innerText = cdTime;
+                if (cdTime <= 0) {
+                    clearInterval(cooldownTimer);
+                    if (currentState === "cooldown") {
+                        currentState = "battle";
+                        updateScreen();
+                    }
+                }
+            }, 1000);
         }
 
         function sendCommand(cmdName) {
