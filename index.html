@@ -2,7 +2,6 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <!-- 強制螢幕比例適應與防縮放 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>FYP 協同作戰系統</title>
@@ -11,7 +10,7 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        /* 基礎佈局：改為橫向導向 */
+
         body {
             margin: 0;
             background-color: #1a1a2e;
@@ -34,8 +33,9 @@
             height: 100%;
             text-align: center;
             padding: 10px;
+            position: relative;
         }
-        /* 戰鬥畫面的橫向專屬排版 */
+
         .landscape-layout {
             display: flex;
             flex-direction: row;
@@ -158,7 +158,6 @@
                 transform: scale(0.95);
             }
 
-        /* 橫向控制網格 (2列3行) */
         .control-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -228,35 +227,33 @@
                 background: #002299;
             }
 
-        .recall-icon {
-            font-size: 20px;
-            margin-bottom: -2px;
+        /* 封印畫面：完美的橫屏左右切割 */
+        #screen-sealing {
+            flex-direction: column;
         }
 
-        .recall-text {
-            font-size: 12px;
-            font-weight: bold;
+        .sealing-header {
+            margin-bottom: 10px;
         }
 
-        /* 封印階段的橫向點擊區 */
         .tap-container {
             display: flex;
             flex-direction: row;
             width: 95vw;
-            height: 60vh;
-            gap: 15px;
-            margin-top: 10px;
+            height: 65vh;
+            gap: 20px;
         }
 
         .tap-zone {
             flex: 1;
-            border-radius: 15px;
+            border-radius: 20px;
             background: rgba(255, 59, 48, 0.15);
             border: 4px solid #ff3b30;
             color: #fff;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             touch-action: manipulation;
@@ -264,23 +261,16 @@
 
             .tap-zone:active {
                 background: rgba(255, 59, 48, 0.6);
-                transform: scale(0.96);
+                transform: scale(0.97);
                 box-shadow: inset 0 0 30px rgba(255, 59, 48, 0.9);
             }
     </style>
 </head>
 <body>
 
-    <!-- 基礎等待/轉場畫面 -->
     <div id="screen-waiting" class="screen active"><div class="loader"></div><h1>等待主機...</h1><p>等待主機進入關卡</p></div>
     <div id="screen-moving" class="screen"><div class="loader" style="border-top-color: #ffcc00;"></div><h1 style="color:#ffcc00">🏃 區域淨空</h1><p>本波次結束！請等待抵達下一戰區。</p></div>
-
-    <!-- 陣亡畫面 (已加入指定文字) -->
-    <div id="screen-dead" class="screen">
-        <h1 style="color:#ff3333">💀 戰死沙場</h1>
-        <p>你的支援怪獸已徹底陣亡。<br>等待可協助封靈階段。</p>
-    </div>
-
+    <div id="screen-dead" class="screen"><h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>等待可協助封靈階段。</p></div>
     <div id="screen-spectator" class="screen"><h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p></div>
 
     <div id="screen-cooldown" class="screen">
@@ -289,7 +279,6 @@
         <h2 style="font-size: 32px; color: #fff; margin:0;"><span id="cd-text">10</span> 秒後可再次喚靈</h2>
     </div>
 
-    <!-- 召喚畫面 (橫向版) -->
     <div id="screen-battle-summon" class="screen">
         <div class="landscape-layout">
             <div class="left-panel">
@@ -308,7 +297,6 @@
         </div>
     </div>
 
-    <!-- 控制畫面 (橫向版) -->
     <div id="screen-battle-control" class="screen">
         <div class="landscape-layout">
             <div class="left-panel">
@@ -327,20 +315,19 @@
                     <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
                     <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
                 </div>
-                <!-- 召回按鈕浮動在右下角 -->
-                <div class="recall-fab" onclick="recallMonster()">
-                    <div class="recall-icon">🔙</div>
-                    <div class="recall-text">召回</div>
-                </div>
+                <div class="recall-fab" onclick="recallMonster()"><div style="font-size: 20px;">🔙</div><div style="font-size: 12px; font-weight: bold;">召回</div></div>
             </div>
         </div>
     </div>
 
-    <!-- 封印畫面 -->
     <div id="screen-sealing-prep" class="screen"><h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1><h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2></div>
+
+    <!-- 橫向版封印畫面 -->
     <div id="screen-sealing" class="screen">
-        <h1 style="margin:0;">緊急封印中！</h1>
-        <div id="tapCount" style="margin: 0; font-size: 40px;">0 下</div>
+        <div class="sealing-header">
+            <h1 style="margin:0;">緊急封印中！</h1>
+            <div id="tapCount" style="margin: 0; font-size: 32px; color: #ff00ff;">0 下</div>
+        </div>
         <div class="tap-container">
             <div class="tap-zone" id="tapLeft">👈 左手狂點</div>
             <div class="tap-zone" id="tapRight">右手狂點 👉</div>
@@ -349,7 +336,14 @@
 
     <script>
         const FIREBASE_BASE_URL = "https://fyp-spirit-default-rtdb.firebaseio.com/coop_session";
-        const userId = "user_" + Math.floor(Math.random() * 10000);
+
+        // 【重要修復】刷新防呆：使用 LocalStorage 記住玩家身分
+        let userId = localStorage.getItem("coop_userId");
+        if (!userId) {
+            userId = "user_" + Math.floor(Math.random() * 100000);
+            localStorage.setItem("coop_userId", userId);
+        }
+
         let currentState = "unknown";
         let hasSummoned = false;
         let myMonsterName = "神秘怪獸";
@@ -358,8 +352,18 @@
         let cooldownTimer = null;
         let taps = 0, isUploadingTaps = false;
 
+        // 開局時檢查雲端是否有我的召喚紀錄 (解決刷新頁面判定失效)
+        checkIfAlreadySummoned();
         fetchGameState();
         setInterval(fetchGameState, 500);
+
+        async function checkIfAlreadySummoned() {
+            try {
+                const res = await fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json?t=${new Date().getTime()}`);
+                const data = await res.json();
+                if (data !== null) { hasSummoned = true; } // 雲端有紀錄，代表已召喚，跳過喚靈按鈕
+            } catch (err) { }
+        }
 
         async function fetchGameState() {
             try {
