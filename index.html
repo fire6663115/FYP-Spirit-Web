@@ -2,26 +2,32 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>FYP 協同作戰系統</title>
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
+        /* 最優解：徹底封殺所有原生的雙指縮放、雙擊放大與邊緣滑動回彈 */
+        html, body {
             margin: 0;
+            padding: 0;
             background-color: #1a1a2e;
             color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
+            width: 100vw;
             overflow: hidden;
             user-select: none;
-            flex-direction: row;
+            -webkit-user-select: none;
+            touch-action: none; /* 絕對禁止瀏覽器原生手勢 (放大/滾動) */
+            overscroll-behavior: none; /* 禁止下拉重整或回彈 */
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-touch-callout: none;
         }
 
         #start-overlay {
@@ -271,7 +277,7 @@
             width: 95vw;
             height: 65vh;
             gap: 20px;
-            position: relative; /* Add for absolute positioning of floating text */
+            position: relative;
         }
 
         .tap-zone {
@@ -286,9 +292,10 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            touch-action: manipulation;
-            position: relative; /* Added to keep floating text inside tap zones */
+            position: relative;
             overflow: hidden;
+            /* 針對點擊區域進行絕對雙點擊防禦 */
+            touch-action: none;
         }
 
             .tap-zone:active {
@@ -329,15 +336,15 @@
             text-shadow: 0 0 10px #00ff00;
         }
 
-        /* Floating Text Animation */
+        /* 漂浮文字動畫設定 */
         .floating-tap {
             position: absolute;
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: #ffeb3b;
-            text-shadow: 0 0 5px #000;
-            pointer-events: none;
-            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 0 0 6px #000;
+            pointer-events: none; /* 防止文字本身擋住下一次點擊 */
+            animation: floatUp 0.6s ease-out forwards;
             z-index: 10;
         }
 
@@ -348,7 +355,7 @@
             }
 
             100% {
-                transform: translateY(-80px) scale(1.5);
+                transform: translateY(-90px) scale(1.6);
                 opacity: 0;
             }
         }
@@ -393,7 +400,8 @@
             </div>
             <div class="right-panel">
                 <h1>⚔️ 戰鬥已開始！</h1><p>戰況緊急，請立即支援：</p>
-                <button class="btn-main" onclick="summonMonster()">喚靈！</button>
+                <!-- 加入 pointerdown 事件以保證點擊零延遲 -->
+                <button class="btn-main" onpointerdown="summonMonster()">喚靈！</button>
             </div>
         </div>
     </div>
@@ -410,13 +418,13 @@
             </div>
             <div class="right-panel">
                 <div class="control-grid">
-                    <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
-                    <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
-                    <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
-                    <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
-                    <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
+                    <div class="cmd-btn active-cmd" id="cmd-Free" onpointerdown="sendCommand('Free')">🐺 隨性索敵</div>
+                    <div class="cmd-btn" id="cmd-Standby" onpointerdown="sendCommand('Standby')">🛡️ 原地待命</div>
+                    <div class="cmd-btn" id="cmd-AttackBoss" onpointerdown="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
+                    <div class="cmd-btn" id="cmd-Defend" onpointerdown="sendCommand('Defend')">🏃 貼身回防</div>
+                    <div class="cmd-btn ult-btn" onpointerdown="sendCommand('Ultimate')">🔥 大招</div>
                 </div>
-                <div class="recall-fab" onclick="recallMonster()"><div style="font-size: 20px;">🔙</div><div style="font-size: 12px; font-weight: bold;">召回</div></div>
+                <div class="recall-fab" onpointerdown="recallMonster()"><div style="font-size: 20px;">🔙</div><div style="font-size: 12px; font-weight: bold;">召回</div></div>
             </div>
         </div>
     </div>
@@ -457,7 +465,6 @@
         let taps = 0, isUploadingTaps = false;
         let hasFetchedResult = false;
 
-        // 全域防呆機制：確保同一次斷線不會狂跳警報
         window.networkErrorShown = false;
 
         function handleNetworkError(err, contextMsg) {
@@ -465,18 +472,20 @@
             if (!window.networkErrorShown) {
                 window.networkErrorShown = true;
                 alert("⚠️ 網路不穩定或被阻擋！\n請切換至 4G/5G 行動網路，或更換 Wi-Fi 以確保召喚順暢。");
-                setTimeout(() => { window.networkErrorShown = false; }, 10000); // 10秒內不重複彈
+                setTimeout(() => { window.networkErrorShown = false; }, 10000);
             }
         }
 
-        document.getElementById('start-overlay').addEventListener('click', async () => {
+        // 使用 pointerdown 取代 click，大幅度降低移動端延遲並避免與縮放衝突
+        document.getElementById('start-overlay').addEventListener('pointerdown', async (e) => {
+            e.preventDefault();
             document.getElementById('start-overlay').style.display = 'none';
             try {
                 let elem = document.documentElement;
                 if (elem.requestFullscreen) await elem.requestFullscreen();
                 else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
                 if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
-            } catch (err) { }
+            } catch (err) { console.log(err); } // 靜默全螢幕報錯，不干擾主程序運行
 
             fetchGameState();
             setInterval(fetchGameState, 300);
@@ -602,7 +611,7 @@
                 updateScreen();
             } catch (err) {
                 handleNetworkError(err, "召喚請求");
-                hasSummoned = false; // 恢復為未召喚狀態，允許玩家換網後重試
+                hasSummoned = false;
                 updateScreen();
             }
         }
@@ -639,64 +648,56 @@
             floatText.className = 'floating-tap';
             floatText.innerText = '+1';
 
-            // 如果是滑鼠點擊或是觸控，抓取座標
-            let x, y;
-            if (e.type === 'pointerdown' || e.type === 'touchstart') {
+            let x = container.offsetWidth / 2;
+            let y = container.offsetHeight / 2;
+
+            if (e && e.type === 'pointerdown') {
                 const rect = container.getBoundingClientRect();
-                // 如果是touch事件
-                if (e.touches && e.touches.length > 0) {
-                    x = e.touches[0].clientX - rect.left;
-                    y = e.touches[0].clientY - rect.top;
-                } else {
-                    x = e.clientX - rect.left;
-                    y = e.clientY - rect.top;
-                }
-            } else {
-                // 預設在正中間
-                x = container.offsetWidth / 2;
-                y = container.offsetHeight / 2;
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
             }
 
             floatText.style.left = `${x}px`;
             floatText.style.top = `${y}px`;
 
-            // 隨機稍微偏移
-            floatText.style.marginLeft = `${(Math.random() - 0.5) * 20}px`;
+            // 隨機橫向偏移，讓打擊感更生動
+            floatText.style.marginLeft = `${(Math.random() - 0.5) * 40}px`;
 
             container.appendChild(floatText);
 
-            // 動畫結束後移除元素
             setTimeout(() => {
                 if (container.contains(floatText)) {
                     container.removeChild(floatText);
                 }
-            }, 800);
+            }, 600);
         }
 
         function registerTap(e) {
             taps++;
             document.getElementById("tapCount").innerText = taps + " 下";
 
-            // 觸發手機實體震動
-            // navigator.vibrate 支援傳入陣列 [震動毫秒] 或數字
+            // 【核心優化】觸發手機硬體實體震動
+            // navigator.vibrate(30) 會調用手機震動馬達，產生極短促的「噠噠」打擊感
             if (navigator.vibrate) {
-                // 產生一個短促的震動
                 navigator.vibrate(30);
             }
 
-            // 產生飄浮文字
-            const container = e.currentTarget;
-            createFloatingText(e, container);
+            // 觸發漂浮彈幕文字
+            createFloatingText(e, e.currentTarget);
         }
 
-        // 綁定事件
-        document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
-        document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
+        // 統一使用 pointerdown 並攔截預設行為，徹底消滅雙擊放大
+        const tapLeft = document.getElementById("tapLeft");
+        const tapRight = document.getElementById("tapRight");
 
-        // 防止iOS預設雙擊放大，干擾狂點
-        document.getElementById("tapLeft").addEventListener("touchstart", function (e) { e.preventDefault(); registerTap(e); }, { passive: false });
-        document.getElementById("tapRight").addEventListener("touchstart", function (e) { e.preventDefault(); registerTap(e); }, { passive: false });
-
+        tapLeft.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            registerTap(e);
+        });
+        tapRight.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            registerTap(e);
+        });
 
         setInterval(() => {
             if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
