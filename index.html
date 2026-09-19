@@ -2,6 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
+    <!-- 強制螢幕比例適應與防縮放 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>FYP 協同作戰系統</title>
@@ -10,18 +11,18 @@
             box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
+        /* 基礎佈局：改為橫向導向 */
         body {
             margin: 0;
             background-color: #1a1a2e;
             color: white;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 100vh;
             overflow: hidden;
             user-select: none;
+            flex-direction: row;
         }
 
         .screen {
@@ -32,25 +33,33 @@
             width: 100%;
             height: 100%;
             text-align: center;
-            padding: 20px;
-            position: relative;
+            padding: 10px;
+        }
+        /* 戰鬥畫面的橫向專屬排版 */
+        .landscape-layout {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: space-evenly;
         }
 
-            .screen.active {
-                display: flex;
-            }
+        .screen.active {
+            display: flex;
+        }
 
         h1 {
-            font-size: 28px;
+            font-size: 26px;
             color: #00ffff;
             text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-            margin-bottom: 10px;
+            margin: 5px 0;
         }
 
         p {
-            margin-top: 0;
+            margin-top: 5px;
             color: #ccc;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .loader {
@@ -60,7 +69,7 @@
             width: 50px;
             height: 50px;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
 
         @keyframes spin {
@@ -73,42 +82,59 @@
             }
         }
 
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 45%;
+        }
+
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 50%;
+            position: relative;
+        }
+
         .card {
             background: linear-gradient(135deg, #443366, #221144);
             border: 2px solid #aa88ff;
             border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-            width: 80%;
-            max-width: 300px;
-            box-shadow: 0 0 20px rgba(170, 136, 255, 0.4);
+            padding: 15px;
+            margin: 10px 0;
+            width: 100%;
+            max-width: 250px;
+            box-shadow: 0 0 15px rgba(170, 136, 255, 0.4);
         }
 
         .monster-name {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: bold;
             color: #fff;
-            margin: 10px 0;
+            margin: 5px 0;
         }
 
         .hp-container {
             width: 100%;
             background: #333;
             border-radius: 10px;
-            margin-top: 10px;
+            margin-top: 5px;
             overflow: hidden;
             border: 2px solid #555;
         }
 
         .hp-bar {
-            height: 15px;
+            height: 12px;
             background: #00ff00;
             width: 100%;
             transition: width 0.3s, background 0.3s;
         }
 
         .hp-text {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             margin-top: 5px;
             color: #fff;
@@ -124,30 +150,30 @@
             border-radius: 30px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(0, 204, 102, 0.4);
-            width: 80%;
+            width: 90%;
+            max-width: 250px;
         }
 
             .btn-main:active {
                 transform: scale(0.95);
             }
 
+        /* 橫向控制網格 (2列3行) */
         .control-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            width: 90vw;
-            max-width: 400px;
-            margin-top: 20px;
-            margin-bottom: 80px;
+            gap: 10px;
+            width: 100%;
+            max-width: 350px;
         }
 
         .cmd-btn {
             background: #2a2a4e;
             border: 2px solid #555588;
             color: white;
-            border-radius: 15px;
-            padding: 20px 10px;
-            font-size: 20px;
+            border-radius: 12px;
+            padding: 15px 5px;
+            font-size: 16px;
             font-weight: bold;
             display: flex;
             flex-direction: column;
@@ -160,7 +186,7 @@
             .cmd-btn.active-cmd {
                 background: #443388;
                 border-color: #aa88ff;
-                box-shadow: 0 0 15px rgba(170, 136, 255, 0.6);
+                box-shadow: 0 0 10px rgba(170, 136, 255, 0.6);
             }
 
             .cmd-btn:active {
@@ -172,20 +198,21 @@
             grid-column: span 2;
             background: linear-gradient(90deg, #ff3366, #cc0033);
             border: 2px solid #ff9999;
-            box-shadow: 0 0 20px rgba(255, 51, 102, 0.5);
+            box-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
+            font-size: 18px;
+            padding: 10px;
         }
 
         .recall-fab {
             position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 75px;
-            height: 75px;
+            bottom: 0;
+            right: 0;
+            width: 65px;
+            height: 65px;
             border-radius: 50%;
             background: linear-gradient(135deg, #3366ff, #0033cc);
-            border: 3px solid #99b3ff;
-            box-shadow: 0 0 25px rgba(51, 102, 255, 0.7);
+            border: 2px solid #99b3ff;
+            box-shadow: 0 0 15px rgba(51, 102, 255, 0.7);
             color: white;
             display: flex;
             flex-direction: column;
@@ -197,43 +224,37 @@
         }
 
             .recall-fab:active {
-                transform: translateX(-50%) scale(0.9);
+                transform: scale(0.9);
                 background: #002299;
             }
 
         .recall-icon {
-            font-size: 24px;
+            font-size: 20px;
             margin-bottom: -2px;
         }
 
         .recall-text {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: bold;
         }
 
-        #tapCount {
-            font-size: 56px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            color: #ff00ff;
-            text-shadow: 0 0 15px #ff00ff;
-        }
-
+        /* 封印階段的橫向點擊區 */
         .tap-container {
             display: flex;
-            width: 90vw;
-            height: 40vh;
+            flex-direction: row;
+            width: 95vw;
+            height: 60vh;
             gap: 15px;
             margin-top: 10px;
         }
 
         .tap-zone {
             flex: 1;
-            border-radius: 20px;
+            border-radius: 15px;
             background: rgba(255, 59, 48, 0.15);
             border: 4px solid #ff3b30;
             color: #fff;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             display: flex;
             align-items: center;
@@ -244,56 +265,82 @@
             .tap-zone:active {
                 background: rgba(255, 59, 48, 0.6);
                 transform: scale(0.96);
-                box-shadow: inset 0 0 50px rgba(255, 59, 48, 0.9);
+                box-shadow: inset 0 0 30px rgba(255, 59, 48, 0.9);
             }
     </style>
 </head>
 <body>
+
+    <!-- 基礎等待/轉場畫面 -->
     <div id="screen-waiting" class="screen active"><div class="loader"></div><h1>等待主機...</h1><p>等待主機進入關卡</p></div>
     <div id="screen-moving" class="screen"><div class="loader" style="border-top-color: #ffcc00;"></div><h1 style="color:#ffcc00">🏃 區域淨空</h1><p>本波次結束！請等待抵達下一戰區。</p></div>
-    <div id="screen-dead" class="screen"><h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>本局遊戲無法再進行召喚。</p></div>
+
+    <!-- 陣亡畫面 (已加入指定文字) -->
+    <div id="screen-dead" class="screen">
+        <h1 style="color:#ff3333">💀 戰死沙場</h1>
+        <p>你的支援怪獸已徹底陣亡。<br>等待可協助封靈階段。</p>
+    </div>
+
     <div id="screen-spectator" class="screen"><h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p></div>
 
     <div id="screen-cooldown" class="screen">
         <h1 style="color:#3366ff">🔙 召回休整中</h1>
-        <div class="loader" style="border-top-color: #3366ff; width:70px; height:70px; margin: 30px auto;"></div>
-        <p>怪獸正在重新凝聚靈力...</p>
-        <h2 style="font-size: 40px; color: #fff;"><span id="cd-text">10</span> 秒後可再次喚靈</h2>
+        <div class="loader" style="border-top-color: #3366ff; width:60px; height:60px; margin: 15px auto;"></div>
+        <h2 style="font-size: 32px; color: #fff; margin:0;"><span id="cd-text">10</span> 秒後可再次喚靈</h2>
     </div>
 
+    <!-- 召喚畫面 (橫向版) -->
     <div id="screen-battle-summon" class="screen">
-        <h1>⚔️ 戰鬥已開始！</h1><p>戰況緊急，請立即支援：</p>
-        <div class="card">
-            <div style="font-size: 40px;" id="monster-icon">🔮</div>
-            <div class="monster-name" id="monster-name">載入中...</div>
-            <div class="hp-container"><div class="hp-bar" id="summon-hp-bar"></div></div>
-            <div class="hp-text">狀態: <span id="summon-hp-text">100</span>%</div>
+        <div class="landscape-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <div style="font-size: 30px;" id="monster-icon">🔮</div>
+                    <div class="monster-name" id="monster-name">載入中...</div>
+                    <div class="hp-container"><div class="hp-bar" id="summon-hp-bar"></div></div>
+                    <div class="hp-text">狀態: <span id="summon-hp-text">100</span>%</div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <h1>⚔️ 戰鬥已開始！</h1>
+                <p>戰況緊急，請立即支援：</p>
+                <button class="btn-main" onclick="summonMonster()">喚靈！</button>
+            </div>
         </div>
-        <button class="btn-main" onclick="summonMonster()">喚靈！</button>
     </div>
 
+    <!-- 控制畫面 (橫向版) -->
     <div id="screen-battle-control" class="screen">
-        <h1 style="color: #aa88ff;">📡 戰術控制台</h1>
-        <div class="hp-container" style="width: 80%; max-width:300px;"><div class="hp-bar" id="ctrl-hp-bar"></div></div>
-        <div class="hp-text" style="margin-bottom:15px;">實時血量: <span id="ctrl-hp-text">100</span>%</div>
-        <div class="control-grid">
-            <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
-            <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
-            <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
-            <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
-            <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
+        <div class="landscape-layout">
+            <div class="left-panel">
+                <div class="card" style="margin:0;">
+                    <h1 style="color: #aa88ff; font-size:22px; margin:0;">📡 戰術控制</h1>
+                    <div class="monster-name" id="ctrl-monster-name" style="font-size: 20px;">神秘怪獸</div>
+                    <div class="hp-container"><div class="hp-bar" id="ctrl-hp-bar"></div></div>
+                    <div class="hp-text">實時血量: <span id="ctrl-hp-text">100</span>%</div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="control-grid">
+                    <div class="cmd-btn active-cmd" id="cmd-Free" onclick="sendCommand('Free')">🐺 隨性索敵</div>
+                    <div class="cmd-btn" id="cmd-Standby" onclick="sendCommand('Standby')">🛡️ 原地待命</div>
+                    <div class="cmd-btn" id="cmd-AttackBoss" onclick="sendCommand('AttackBoss')">⚔️ 鎖定強攻</div>
+                    <div class="cmd-btn" id="cmd-Defend" onclick="sendCommand('Defend')">🏃 貼身回防</div>
+                    <div class="cmd-btn ult-btn" onclick="sendCommand('Ultimate')">🔥 大招</div>
+                </div>
+                <!-- 召回按鈕浮動在右下角 -->
+                <div class="recall-fab" onclick="recallMonster()">
+                    <div class="recall-icon">🔙</div>
+                    <div class="recall-text">召回</div>
+                </div>
+            </div>
         </div>
-        <div class="recall-fab" onclick="recallMonster()"><div class="recall-icon">🔙</div><div class="recall-text">召回</div></div>
     </div>
 
-    <div id="screen-sealing-prep" class="screen">
-        <h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1>
-        <h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2>
-    </div>
-
+    <!-- 封印畫面 -->
+    <div id="screen-sealing-prep" class="screen"><h1 style="color: #ff3333; animation: pulseAnim 1s infinite alternate;">⚠️ 警告 ⚠️</h1><h2 style="color: #ffcc00;">Boss 瀕死！準備封印！</h2></div>
     <div id="screen-sealing" class="screen">
-        <h1>緊急封印中！</h1>
-        <div id="tapCount">0 下</div>
+        <h1 style="margin:0;">緊急封印中！</h1>
+        <div id="tapCount" style="margin: 0; font-size: 40px;">0 下</div>
         <div class="tap-container">
             <div class="tap-zone" id="tapLeft">👈 左手狂點</div>
             <div class="tap-zone" id="tapRight">右手狂點 👉</div>
@@ -309,7 +356,7 @@
         let isPoolLoaded = false;
         let currentHp = 100;
         let cooldownTimer = null;
-        let taps = 0, isUploadingTaps = false; // 點擊計數器
+        let taps = 0, isUploadingTaps = false;
 
         fetchGameState();
         setInterval(fetchGameState, 500);
@@ -322,6 +369,7 @@
                     if (Array.isArray(poolData) && poolData.length > 0) {
                         myMonsterName = poolData[Math.floor(Math.random() * poolData.length)];
                         document.getElementById("monster-name").innerText = myMonsterName;
+                        document.getElementById("ctrl-monster-name").innerText = myMonsterName;
                         isPoolLoaded = true;
                     }
                 }
@@ -345,12 +393,9 @@
                         hasSummoned = false;
                         if (cooldownTimer) clearInterval(cooldownTimer);
                     }
-                    // 【重點】每次準備進入封印時，重置點擊次數！
                     if (cleanState === "sealing_prep" || cleanState === "waiting") {
-                        taps = 0;
-                        document.getElementById("tapCount").innerText = "0 下";
+                        taps = 0; document.getElementById("tapCount").innerText = "0 下";
                     }
-
                     if (!(currentState === "cooldown" && cleanState === "battle")) {
                         currentState = cleanState;
                     }
@@ -416,7 +461,6 @@
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
-        // 每秒上傳總點擊次數 (交給 Unity 計算 Delta 差值，防止掉封包)
         setInterval(() => {
             if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
                 isUploadingTaps = true;
