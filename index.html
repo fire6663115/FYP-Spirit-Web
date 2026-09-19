@@ -430,6 +430,18 @@
         let taps = 0, isUploadingTaps = false;
         let hasFetchedResult = false;
 
+        // 全域防呆機制：確保同一次斷線不會狂跳警報
+        window.networkErrorShown = false;
+
+        function handleNetworkError(err, contextMsg) {
+            console.error(`Firebase 連線錯誤 (${contextMsg}):`, err);
+            if (!window.networkErrorShown) {
+                window.networkErrorShown = true;
+                alert("⚠️ 網路不穩定或被阻擋！\n請切換至 4G/5G 行動網路，或更換 Wi-Fi 以確保召喚順暢。");
+                setTimeout(() => { window.networkErrorShown = false; }, 10000); // 10秒內不重複彈
+            }
+        }
+
         document.getElementById('start-overlay').addEventListener('click', async () => {
             document.getElementById('start-overlay').style.display = 'none';
             try {
@@ -516,7 +528,9 @@
                     currentState = nextState;
                     updateScreen();
                 }
-            } catch (err) { }
+            } catch (err) {
+                handleNetworkError(err, "狀態輪詢");
+            }
         }
 
         function startPrepCountdown() {
@@ -548,7 +562,6 @@
             }
         }
 
-        // === 【除錯與排查升級版】召喚方法 ===
         async function summonMonster() {
             if (!isPoolLoaded) {
                 alert("❌ 錯誤：怪獸卡池未載入！\n原因：Unity 端尚未上傳卡池到 Firebase。\n請確保 Unity 中 CoopManager 的 Coop Monster Pool 已放入 MonsterData！");
@@ -561,14 +574,18 @@
                 sendCommand("Free");
                 updateScreen();
             } catch (err) {
-                alert("❌ 召喚網路請求失敗：" + err.message);
+                handleNetworkError(err, "召喚請求");
+                hasSummoned = false; // 恢復為未召喚狀態，允許玩家換網後重試
+                updateScreen();
             }
         }
 
         function recallMonster() {
             const payload = {}; payload[userId] = "Recall";
-            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) });
-            fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json`, { method: 'DELETE' });
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) })
+                .catch(err => handleNetworkError(err, "召回指令"));
+            fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json`, { method: 'DELETE' })
+                .catch(err => handleNetworkError(err, "清除召喚狀態"));
 
             hasSummoned = false; currentState = "cooldown"; updateScreen();
             let cdTime = 10; document.getElementById("cd-text").innerText = cdTime;
@@ -586,7 +603,8 @@
             const activeBtn = document.getElementById('cmd-' + cmdName);
             if (activeBtn) activeBtn.classList.add('active-cmd');
             const payload = {}; payload[userId] = cmdName;
-            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => { });
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) })
+                .catch(err => handleNetworkError(err, "戰術指令"));
         }
 
         function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
@@ -598,7 +616,11 @@
                 isUploadingTaps = true;
                 const payload = {}; payload[userId] = taps;
                 fetch(`${FIREBASE_BASE_URL}/taps.json`, { method: 'PATCH', body: JSON.stringify(payload) })
-                    .then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
+                    .then(() => isUploadingTaps = false)
+                    .catch(err => {
+                        isUploadingTaps = false;
+                        handleNetworkError(err, "點擊上傳");
+                    });
             }
         }, 300);
     </script>
