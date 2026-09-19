@@ -24,14 +24,13 @@
             flex-direction: row;
         }
 
-        /* 啟動遮罩：強制玩家點擊以觸發全螢幕與橫屏鎖定 */
         #start-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
+            background: rgba(0,0,0,0.95);
             z-index: 99999;
             display: flex;
             flex-direction: column;
@@ -302,11 +301,35 @@
             text-shadow: 0 0 20px #ff0000;
             margin: 10px 0;
         }
+
+        /* 結算戰報 UI */
+        .result-box {
+            background: rgba(255,255,255,0.1);
+            border: 2px solid #ffcc00;
+            border-radius: 20px;
+            padding: 20px;
+            width: 80%;
+            max-width: 400px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(255,204,0,0.3);
+        }
+
+        .result-stat {
+            font-size: 24px;
+            font-weight: bold;
+            color: #fff;
+            margin: 15px 0;
+        }
+
+        .result-highlight {
+            color: #00ff00;
+            font-size: 32px;
+            text-shadow: 0 0 10px #00ff00;
+        }
     </style>
 </head>
 <body>
 
-    <!-- 強制全螢幕與橫屏鎖定啟動按鈕 -->
     <div id="start-overlay">
         <h1>🚀 點擊進入協同系統</h1>
         <p>將自動切換為全螢幕橫向模式</p>
@@ -316,6 +339,16 @@
     <div id="screen-moving" class="screen"><div class="loader" style="border-top-color: #ffcc00;"></div><h1 style="color:#ffcc00">🏃 區域淨空</h1><p>本波次結束！請等待抵達下一戰區。</p></div>
     <div id="screen-dead" class="screen"><h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>等待可協助封靈階段。</p></div>
     <div id="screen-spectator" class="screen"><h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p></div>
+
+    <!-- 結算戰報畫面 -->
+    <div id="screen-result" class="screen">
+        <h1 style="color: #ffcc00; font-size: 36px;">🎉 封印大捷！ 🎉</h1>
+        <p>戰鬥已結束，以下是你的專屬戰報：</p>
+        <div class="result-box">
+            <div class="result-stat">你的狂點次數: <br><span class="result-highlight" id="res-taps">0</span> 下</div>
+            <div class="result-stat">協同團隊貢獻: <br><span class="result-highlight" id="res-pct">0</span> %</div>
+        </div>
+    </div>
 
     <div id="screen-cooldown" class="screen">
         <h1 style="color:#3366ff">🔙 召回休整中</h1>
@@ -397,33 +430,42 @@
         let cooldownTimer = null;
         let prepTimer = null;
         let taps = 0, isUploadingTaps = false;
+        let hasFetchedResult = false; // 防止重複拉取戰報
 
-        // 全螢幕與橫向鎖定 API
         document.getElementById('start-overlay').addEventListener('click', async () => {
             document.getElementById('start-overlay').style.display = 'none';
             try {
                 let elem = document.documentElement;
                 if (elem.requestFullscreen) await elem.requestFullscreen();
                 else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
-                if (screen.orientation && screen.orientation.lock) {
-                    await screen.orientation.lock('landscape');
-                }
-            } catch (err) { console.log("Orientation lock not fully supported on this device."); }
-
-            checkIfAlreadySummoned();
-            fetchGameState();
-            setInterval(fetchGameState, 300); // 極限提速至 0.3s
-        });
-
-        async function checkIfAlreadySummoned() {
-            try {
-                const res = await fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json?t=${new Date().getTime()}`);
-                if (await res.json() !== null) hasSummoned = true;
+                if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
             } catch (err) { }
-        }
+
+            fetchGameState();
+            setInterval(fetchGameState, 300);
+        });
 
         async function fetchGameState() {
             try {
+                const [stateRes, specRes, deadRes, hpRes, spawnRes] = await Promise.all([
+                    fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`),
+                    fetch(`${FIREBASE_BASE_URL}/spectators/${userId}.json?t=${new Date().getTime()}`),
+                    fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`),
+                    fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`),
+                    fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json?t=${new Date().getTime()}`)
+                ]);
+
+                let cleanState = (await stateRes.json()) || "waiting";
+                cleanState = String(cleanState).replace(/"/g, '');
+
+                const isSpectator = (await specRes.json()) === true;
+                const isDead = (await deadRes.json()) === true;
+                const hpData = await hpRes.json();
+                const spawnData = await spawnRes.json();
+
+                if (hpData !== null) { currentHp = parseFloat(hpData); updateHpUI(); }
+                hasSummoned = (spawnData !== null && spawnData !== "null");
+
                 if (!isPoolLoaded) {
                     const poolRes = await fetch(`${FIREBASE_BASE_URL}/pool.json?t=${new Date().getTime()}`);
                     const poolData = await poolRes.json();
@@ -435,38 +477,46 @@
                     }
                 }
 
-                const specRes = await fetch(`${FIREBASE_BASE_URL}/spectators/${userId}.json?t=${new Date().getTime()}`);
-                if (await specRes.json() === true) { currentState = "spectator"; updateScreen(); return; }
+                let nextState = cleanState;
 
-                const deadRes = await fetch(`${FIREBASE_BASE_URL}/dead_players/${userId}.json?t=${new Date().getTime()}`);
-                if (await deadRes.json() === true) { currentState = "dead"; updateScreen(); return; }
+                if (cleanState === "battle") {
+                    if (isSpectator) nextState = "spectator";
+                    else if (isDead) nextState = "dead";
+                    else if (currentState === "cooldown") nextState = "cooldown";
+                }
 
-                const hpRes = await fetch(`${FIREBASE_BASE_URL}/hp/${userId}.json?t=${new Date().getTime()}`);
-                const hpData = await hpRes.json();
-                if (hpData !== null) { currentHp = parseFloat(hpData); updateHpUI(); }
-
-                const stateRes = await fetch(`${FIREBASE_BASE_URL}/state.json?t=${new Date().getTime()}`);
-                let cleanState = (await stateRes.json()) || "waiting";
-                cleanState = String(cleanState).replace(/"/g, '');
-
-                if (cleanState !== currentState) {
-                    if (cleanState === "waiting" || cleanState === "moving") {
-                        hasSummoned = false;
-                        if (cooldownTimer) clearInterval(cooldownTimer);
+                // === 讀取戰報邏輯 ===
+                if (cleanState === "result" && !hasFetchedResult) {
+                    hasFetchedResult = true;
+                    const resFetch = await fetch(`${FIREBASE_BASE_URL}/results/${userId}.json?t=${new Date().getTime()}`);
+                    const resData = await resFetch.json();
+                    if (resData) {
+                        document.getElementById("res-taps").innerText = resData.taps;
+                        document.getElementById("res-pct").innerText = resData.percentage;
+                    } else {
+                        document.getElementById("res-taps").innerText = "0";
+                        document.getElementById("res-pct").innerText = "0.0";
                     }
-                    if (cleanState === "sealing_prep" && currentState !== "sealing_prep") {
-                        startPrepCountdown();
-                    } else if (cleanState === "sealing") {
-                        if (prepTimer) clearInterval(prepTimer);
-                    }
+                }
 
-                    if (cleanState === "waiting" || cleanState === "sealing_prep") {
-                        taps = 0; document.getElementById("tapCount").innerText = "0 下";
-                    }
+                if (cleanState === "waiting" || cleanState === "moving") {
+                    hasSummoned = false;
+                    hasFetchedResult = false; // 重置戰報標記
+                    if (cooldownTimer) clearInterval(cooldownTimer);
+                }
 
-                    if (!(currentState === "cooldown" && cleanState === "battle")) {
-                        currentState = cleanState;
-                    }
+                if (cleanState === "sealing_prep" && currentState !== "sealing_prep") {
+                    startPrepCountdown();
+                } else if (cleanState === "sealing") {
+                    if (prepTimer) clearInterval(prepTimer);
+                }
+
+                if (cleanState === "sealing_prep" || cleanState === "waiting") {
+                    taps = 0; document.getElementById("tapCount").innerText = "0 下";
+                }
+
+                if (nextState !== currentState) {
+                    currentState = nextState;
                     updateScreen();
                 }
             } catch (err) { }
@@ -547,7 +597,7 @@
                 fetch(`${FIREBASE_BASE_URL}/taps.json`, { method: 'PATCH', body: JSON.stringify(payload) })
                     .then(() => isUploadingTaps = false).catch(() => isUploadingTaps = false);
             }
-        }, 300); // 提速上傳
+        }, 300);
     </script>
 </body>
 </html>
