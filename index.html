@@ -607,7 +607,16 @@
                 .catch(err => handleNetworkError(err, "戰術指令"));
         }
 
-        function registerTap() { taps++; document.getElementById("tapCount").innerText = taps + " 下"; }
+        function registerTap() {
+            taps++;
+            document.getElementById("tapCount").innerText = taps + " 下";
+
+            // 觸發手機實體震動 (40毫秒的短震動，打擊感極佳)
+            if (navigator.vibrate) {
+                navigator.vibrate(40);
+            }
+        }
+
         document.getElementById("tapLeft").addEventListener("pointerdown", registerTap);
         document.getElementById("tapRight").addEventListener("pointerdown", registerTap);
 
