@@ -302,7 +302,6 @@
             margin: 10px 0;
         }
 
-        /* 結算戰報 UI */
         .result-box {
             background: rgba(255,255,255,0.1);
             border: 2px solid #ffcc00;
@@ -340,7 +339,6 @@
     <div id="screen-dead" class="screen"><h1 style="color:#ff3333">💀 戰死沙場</h1><p>你的支援怪獸已徹底陣亡。<br>等待可協助封靈階段。</p></div>
     <div id="screen-spectator" class="screen"><h1 style="color:#aaaaaa">👁️ 觀戰模式</h1><p>連線房間已達上限！請在場外加油。</p></div>
 
-    <!-- 結算戰報畫面 -->
     <div id="screen-result" class="screen">
         <h1 style="color: #ffcc00; font-size: 36px;">🎉 封印大捷！ 🎉</h1>
         <p>戰鬥已結束，以下是你的專屬戰報：</p>
@@ -430,7 +428,7 @@
         let cooldownTimer = null;
         let prepTimer = null;
         let taps = 0, isUploadingTaps = false;
-        let hasFetchedResult = false; // 防止重複拉取戰報
+        let hasFetchedResult = false;
 
         document.getElementById('start-overlay').addEventListener('click', async () => {
             document.getElementById('start-overlay').style.display = 'none';
@@ -485,7 +483,6 @@
                     else if (currentState === "cooldown") nextState = "cooldown";
                 }
 
-                // === 讀取戰報邏輯 ===
                 if (cleanState === "result" && !hasFetchedResult) {
                     hasFetchedResult = true;
                     const resFetch = await fetch(`${FIREBASE_BASE_URL}/results/${userId}.json?t=${new Date().getTime()}`);
@@ -501,7 +498,7 @@
 
                 if (cleanState === "waiting" || cleanState === "moving") {
                     hasSummoned = false;
-                    hasFetchedResult = false; // 重置戰報標記
+                    hasFetchedResult = false;
                     if (cooldownTimer) clearInterval(cooldownTimer);
                 }
 
@@ -551,15 +548,21 @@
             }
         }
 
+        // === 【除錯與排查升級版】召喚方法 ===
         async function summonMonster() {
-            if (!isPoolLoaded) return;
+            if (!isPoolLoaded) {
+                alert("❌ 錯誤：怪獸卡池未載入！\n原因：Unity 端尚未上傳卡池到 Firebase。\n請確保 Unity 中 CoopManager 的 Coop Monster Pool 已放入 MonsterData！");
+                return;
+            }
             hasSummoned = true;
             try {
                 const payload = {}; payload[userId] = myMonsterName;
                 await fetch(`${FIREBASE_BASE_URL}/spawns.json`, { method: 'PATCH', body: JSON.stringify(payload) });
                 sendCommand("Free");
                 updateScreen();
-            } catch (err) { }
+            } catch (err) {
+                alert("❌ 召喚網路請求失敗：" + err.message);
+            }
         }
 
         function recallMonster() {
