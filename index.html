@@ -276,6 +276,7 @@
             width: 95vw;
             height: 65vh;
             gap: 20px;
+            position: relative;
         }
 
         .tap-zone {
@@ -290,6 +291,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
             touch-action: none;
         }
 
@@ -329,6 +332,29 @@
             color: #00ff00;
             font-size: 32px;
             text-shadow: 0 0 10px #00ff00;
+        }
+
+        .floating-tap {
+            position: absolute;
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffeb3b;
+            text-shadow: 0 0 6px #000;
+            pointer-events: none;
+            animation: floatUp 0.6s ease-out forwards;
+            z-index: 10;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-90px) scale(1.6);
+                opacity: 0;
+            }
         }
     </style>
 </head>
@@ -441,20 +467,20 @@
             console.error(`Firebase 連線錯誤 (${contextMsg}):`, err);
             if (!window.networkErrorShown) {
                 window.networkErrorShown = true;
-                alert("⚠️ 網路不穩定！\n請更換網路以確保連線。");
+                alert("⚠️ 網路不穩定或被阻擋！\n請切換至 4G/5G 行動網路，或更換 Wi-Fi 以確保召喚順暢。");
                 setTimeout(() => { window.networkErrorShown = false; }, 10000);
             }
         }
 
-        document.getElementById('start-overlay').addEventListener('pointerdown', async (e) => {
-            e.preventDefault();
+        // 【修復核心】：進入按鈕必須使用標準的 'click' 事件，瀏覽器才會允許全螢幕和橫向鎖定
+        document.getElementById('start-overlay').addEventListener('click', async (e) => {
             document.getElementById('start-overlay').style.display = 'none';
             try {
                 let elem = document.documentElement;
                 if (elem.requestFullscreen) await elem.requestFullscreen();
                 else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
                 if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
-            } catch (err) { }
+            } catch (err) { console.log("全螢幕請求被攔截", err); }
 
             fetchGameState();
             setInterval(fetchGameState, 300);
@@ -569,7 +595,7 @@
 
         async function summonMonster() {
             if (!isPoolLoaded) {
-                alert("怪獸卡池未載入，請確認主機已上傳卡池。");
+                alert("❌ 錯誤：怪獸卡池未載入！\n原因：Unity 端尚未上傳卡池到 Firebase。\n請確保 Unity 中 CoopManager 的 Coop Monster Pool 已放入 MonsterData！");
                 return;
             }
             hasSummoned = true;
@@ -587,8 +613,8 @@
 
         function recallMonster() {
             const payload = {}; payload[userId] = "Recall";
-            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => console.log("err"));
-            fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json`, { method: 'DELETE' }).catch(() => console.log("err"));
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => { });
+            fetch(`${FIREBASE_BASE_URL}/spawns/${userId}.json`, { method: 'DELETE' }).catch(() => { });
 
             hasSummoned = false; currentState = "cooldown"; updateScreen();
             let cdTime = 10; document.getElementById("cd-text").innerText = cdTime;
@@ -606,21 +632,59 @@
             const activeBtn = document.getElementById('cmd-' + cmdName);
             if (activeBtn) activeBtn.classList.add('active-cmd');
             const payload = {}; payload[userId] = cmdName;
-            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => console.log("err"));
+            fetch(`${FIREBASE_BASE_URL}/commands.json`, { method: 'PATCH', body: JSON.stringify(payload) }).catch(() => { });
+        }
+
+        function createFloatingText(e, container) {
+            const floatText = document.createElement('div');
+            floatText.className = 'floating-tap';
+            floatText.innerText = '+1';
+
+            let x = container.offsetWidth / 2;
+            let y = container.offsetHeight / 2;
+
+            if (e && e.type === 'pointerdown') {
+                const rect = container.getBoundingClientRect();
+                x = e.clientX - rect.left;
+                y = e.clientY - rect.top;
+            }
+
+            floatText.style.left = `${x}px`;
+            floatText.style.top = `${y}px`;
+            floatText.style.marginLeft = `${(Math.random() - 0.5) * 40}px`;
+
+            container.appendChild(floatText);
+
+            setTimeout(() => {
+                if (container.contains(floatText)) {
+                    container.removeChild(floatText);
+                }
+            }, 600);
         }
 
         function registerTap(e) {
             taps++;
             document.getElementById("tapCount").innerText = taps + " 下";
 
-            // 【通知級震動】使用陣列：震動 200ms -> 停 100ms -> 震 200ms
+            // 實體震動
             if (navigator.vibrate) {
-                navigator.vibrate([200, 100, 200]);
+                navigator.vibrate(30);
             }
+
+            createFloatingText(e, e.currentTarget);
         }
 
-        document.getElementById("tapLeft").addEventListener("pointerdown", function (e) { e.preventDefault(); registerTap(e); });
-        document.getElementById("tapRight").addEventListener("pointerdown", function (e) { e.preventDefault(); registerTap(e); });
+        const tapLeft = document.getElementById("tapLeft");
+        const tapRight = document.getElementById("tapRight");
+
+        tapLeft.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            registerTap(e);
+        });
+        tapRight.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            registerTap(e);
+        });
 
         setInterval(() => {
             if (currentState === "sealing" && taps > 0 && !isUploadingTaps) {
