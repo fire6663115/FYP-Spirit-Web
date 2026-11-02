@@ -80,21 +80,23 @@
         }
         .hud-btn.detach-mode { border-color: #ffd166; color: #ffd166; background: rgba(255, 209, 102, 0.15); }
         .hud-btn.detach-mode.active-detach { border-color: #06d6a0; color: #06d6a0; background: rgba(6, 214, 160, 0.2); }
-        .hud-btn.pose-btn { border-color: #c084fc; color: #e9d5ff; background: rgba(192, 132, 252, 0.15); }
 
         #shutter-flash {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: white; opacity: 0; pointer-events: none; z-index: 200;
             transition: opacity 0.08s ease-out;
         }
+        #ar-debug-panel { position: fixed; left: 8px; bottom: 150px; z-index: 130; max-width: 95vw; max-height: 210px; overflow: auto; background: #07121fee; color: #b8ffd8; padding: 8px; font: 10px/1.4 monospace; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
     </style>
 </head>
 <body>
 
-    <div id="scan-guide">请将镜头对准实体卡牌正面</div>
+    <div id="scan-guide">请将卡牌平放桌面，镜头对准正面</div>
 
     <div id="top-right-tools">
         <button id="btn-tweak-toggle" class="tool-pill tweak-btn">🎯 站位微调</button>
+        <button id="btn-light-toggle" class="tool-pill">环境光：开（近似）</button>
+        <button id="btn-debug-toggle" class="tool-pill" hidden>调试：开</button>
     </div>
 
     <!-- 屏幕内实时站位微调器 -->
@@ -126,26 +128,27 @@
     </div>
 
     <div id="action-bar">
-        <button class="hud-btn pose-btn" id="btn-pose">视角：竖拿卡面</button>
         <button class="hud-btn detach-mode" id="btn-detach">踏入现实 (合影)</button>
         <button class="hud-btn" id="btn-snap">AR 合影拍照</button>
         <button class="hud-btn" id="btn-full">全屏</button>
     </div>
 
     <div id="shutter-flash"></div>
+    <pre id="ar-debug-panel" hidden></pre>
 
     <!-- 预设静态 mindar-image-target 锚点，确保 MindAR 初始化时 100% 同步注册 setupMarker -->
     <a-scene
         id="ar-scene"
         mindar-image="imageTargetSrc: ./card_targets.mind; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 60; warmupTolerance: 3;"
         color-space="sRGB"
-        renderer="colorManagement: true, physicallyCorrectLights: true, preserveDrawingBuffer: true"
+        renderer="colorManagement: true; physicallyCorrectLights: false"
         vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: false">
 
         <a-camera position="0 0 0" near="0.01" look-controls="enabled: false"></a-camera>
-        <a-light type="ambient" color="#ffffff" intensity="0.85"></a-light>
-        <a-light type="directional" color="#d8f3dc" intensity="1.1" position="1 2.5 1.5"></a-light>
+        <a-light id="ambient-light" type="ambient" color="#ffffff" intensity="0.4"></a-light>
+        <a-light id="key-light" type="directional" color="#ffffff" intensity="1.325" position="1 2.5 1.5"></a-light>
+        <a-light id="fill-light" type="directional" color="#ffffff" intensity="0.23" position="-2 1 0.5"></a-light>
 
         <!-- 静态预置主卡牌锚点 (避免异步 fetch 晚于 MindAR _startAR 导致 postMatrix 为空无法识别) -->
         <a-entity id="preset-anchor-0" mindar-image-target="targetIndex: 0"></a-entity>
@@ -231,15 +234,93 @@
         }
         const CONTACT_SHADOW_SRC = createContactShadowCanvas();
 
+        // 仅本机内存中的 24x18 采样；不推断真实光源方向，不存图、不上传。
+        const environmentLight = {
+            enabled: new URLSearchParams(location.search).get('lighting') !== 'off',
+            canvas: document.createElement('canvas'), context: null,
+            brightness: 0.5, targetBrightness: 0.5, tint: [1, 1, 1], targetTint: [1, 1, 1],
+            shadowFactor: 0.825, lastUpdate: null, lastSample: -Infinity, sampleCount: 0, sampleError: false
+        };
+        environmentLight.canvas.width = 24; environmentLight.canvas.height = 18;
+        environmentLight.context = environmentLight.canvas.getContext('2d', { willReadFrequently: true });
+
+        function estimateCameraLight(data) {
+            let red = 0, green = 0, blue = 0, count = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 16) continue;
+                red += data[i]; green += data[i + 1]; blue += data[i + 2]; count++;
+            }
+            if (!count) return { brightness: 0.5, tint: [1, 1, 1] };
+            red /= count; green /= count; blue /= count;
+            const mean = Math.max((red + green + blue) / 3, 1);
+            const tint = [red, green, blue].map(channel => THREE.MathUtils.clamp(1 + (channel / mean - 1) * 0.12, 0.92, 1.08));
+            return { brightness: (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255, tint };
+        }
+        function setEnvironmentTarget(estimate) {
+            environmentLight.targetBrightness = THREE.MathUtils.clamp(estimate.brightness, 0.08, 0.95);
+            environmentLight.targetTint = estimate.tint.map(value => THREE.MathUtils.clamp(value, 0.92, 1.08));
+        }
+        function setEnvironmentEnabled(enabled) {
+            environmentLight.enabled = !!enabled;
+            if (!enabled) setEnvironmentTarget({ brightness: 0.5, tint: [1, 1, 1] });
+            const button = document.getElementById('btn-light-toggle');
+            button.textContent = enabled ? '环境光：开（近似）' : '环境光：关';
+        }
+        function sampleEnvironmentLight(now, source) {
+            if (!environmentLight.enabled || document.hidden || !source || now - environmentLight.lastSample < 500) return;
+            if (source.tagName === 'VIDEO' && (source.readyState < 2 || !source.videoWidth)) return;
+            if (source.tagName !== 'VIDEO' && source.tagName !== 'CANVAS') return;
+            environmentLight.lastSample = now;
+            const context = environmentLight.context;
+            if (!context) return;
+            try {
+                context.drawImage(source, 0, 0, 24, 18);
+                const pixels = context.getImageData(0, 0, 24, 18).data;
+                setEnvironmentTarget(estimateCameraLight(pixels));
+                environmentLight.sampleCount++;
+            } catch (error) {
+                if (!environmentLight.sampleError) debugLog('light-sample-unavailable');
+                environmentLight.sampleError = true;
+            } finally {
+                context.clearRect(0, 0, 24, 18);
+            }
+        }
+        function setContactShadowOpacity(shadow, baseOpacity) {
+            if (!shadow) return;
+            shadow.contactOpacity = baseOpacity;
+            const mesh = shadow.getObject3D('mesh');
+            if (mesh && mesh.material) mesh.material.opacity = baseOpacity * environmentLight.shadowFactor;
+        }
+        function updateEnvironmentLight(now, source = document.querySelector('video')) {
+            if (document.hidden) { environmentLight.lastUpdate = now; return; }
+            if (activeView && activeView.root.object3D.visible) sampleEnvironmentLight(now, source);
+            const dt = environmentLight.lastUpdate === null ? 0 : THREE.MathUtils.clamp(now - environmentLight.lastUpdate, 0, 250);
+            environmentLight.lastUpdate = now;
+            const alpha = 1 - Math.exp(-dt / 1500);
+            environmentLight.brightness += (environmentLight.targetBrightness - environmentLight.brightness) * alpha;
+            environmentLight.tint = environmentLight.tint.map((value, i) => value + (environmentLight.targetTint[i] - value) * alpha);
+            const b = environmentLight.brightness;
+            const intensities = [0.22 + 0.36 * b, 0.75 + 1.15 * b, 0.12 + 0.22 * b];
+            ['ambient-light', 'key-light', 'fill-light'].forEach((id, i) => {
+                const light = document.getElementById(id).getObject3D('light');
+                if (!light) return;
+                light.intensity = intensities[i];
+                light.color.setRGB(...environmentLight.tint);
+            });
+            environmentLight.shadowFactor = 0.65 + 0.35 * b;
+            cardViews.forEach(view => setContactShadowOpacity(view.shadow, view.shadow.contactOpacity ?? 0.85));
+        }
+
         const sceneEl = document.getElementById('ar-scene');
         const worldAnchor = document.getElementById('world-anchor');
         const scanGuide = document.getElementById('scan-guide');
         const hudPanel = document.getElementById('hud-panel');
         const actionBar = document.getElementById('action-bar');
-        const btnPose = document.getElementById('btn-pose');
         const btnDetach = document.getElementById('btn-detach');
         const btnSnap = document.getElementById('btn-snap');
         const shutterFlash = document.getElementById('shutter-flash');
+        document.getElementById('btn-light-toggle').addEventListener('click', () => setEnvironmentEnabled(!environmentLight.enabled));
+        setEnvironmentEnabled(environmentLight.enabled);
 
         const btnTweakToggle = document.getElementById('btn-tweak-toggle');
         const tweakPanel = document.getElementById('tweak-panel');
@@ -271,16 +352,124 @@
         const cardViews = [];
         let isDetected = false;
         let isDetached = false;
-        let isFlatTableMode = false;
         let currentYaw = 0;
         let currentScale = 0.85;
         let tweakY = 0.0;
         let tweakZ = FOOT_Z;
         let worldPosX = 0, worldPosY = -0.25, worldPosZ = -1.2;
+        let detachedUnitScale = 1;
+        let detachedFitDistance = 0;
+        let detachedCameraSignature = '';
+        const detachedLocalMatrix = new THREE.Matrix4();
+        const detachedParentInverse = new THREE.Matrix4();
+        const detachedIdentity = new THREE.Quaternion();
+        const detachedPosition = new THREE.Vector3();
+        const detachedScale = new THREE.Vector3();
+        const debugPanel = document.getElementById('ar-debug-panel');
+        const debugToggle = document.getElementById('btn-debug-toggle');
+        let debugEnabled = new URLSearchParams(location.search).get('debug') === '1';
+        const debugEvents = [];
+
+        function diagnosticSnapshot(event) {
+            const camera = sceneEl.camera;
+            const root = activeView && activeView.root.object3D;
+            return { event, detached: isDetached, detected: isDetected,
+                camera: camera ? { near: camera.near, far: camera.far, fov: camera.fov, aspect: camera.aspect } : {},
+                rootVisible: !!(root && root.visible), pivotVisible: !!(activePivot && activePivot.object3D.visible),
+                world: [worldPosX, worldPosY, worldPosZ], unitScale: detachedUnitScale,
+                displayPosition: root ? root.matrix.elements.slice(12, 15) : [],
+                modelReady: !!(activePivot && activePivot.querySelector('a-gltf-model').getObject3D('mesh')),
+                modelVisible: !!(activePivot && activePivot.querySelector('a-gltf-model').object3D.visible),
+                light: { enabled: environmentLight.enabled, brightness: environmentLight.brightness, samples: environmentLight.sampleCount, error: environmentLight.sampleError },
+                graceRemaining: lossGraceTimer === null ? 0 : Math.max(0, lossGraceDeadline - performance.now()) };
+        }
+        function debugLog(event) {
+            if (!debugEnabled) return;
+            const data = diagnosticSnapshot(event);
+            debugEvents.push(data); if (debugEvents.length > 5) debugEvents.shift();
+            debugPanel.textContent = debugEvents.map(row => JSON.stringify(row)).join('\n');
+            console.debug('[FYP AR]', data);
+        }
+        function setDebugEnabled(enabled) {
+            debugEnabled = !!enabled;
+            debugToggle.hidden = false;
+            debugPanel.hidden = !debugEnabled;
+            debugToggle.textContent = debugEnabled ? '调试：开' : '调试：关';
+            if (debugEnabled) debugLog('debug-enabled');
+        }
+        window.FYPDebug = { get enabled() { return debugEnabled; }, setEnabled: setDebugEnabled, snapshot: diagnosticSnapshot };
+        debugToggle.addEventListener('click', () => setDebugEnabled(!debugEnabled));
+
+        // 只测量蒙皮顶点，不修改模型。包络用于相机取景，不重新校准脚底。
+        function measureModelEnvelope(object) {
+            if (object.parent) object.parent.updateWorldMatrix(true, false);
+            // SkinnedMesh.updateMatrixWorld 也会同步 attached bindMatrixInverse。
+            // 只调用 updateWorldMatrix 会漏掉这一步，导致蒙皮包络偏大或偏小。
+            object.updateMatrixWorld(true);
+            const inverse = object.matrixWorld.clone().invert();
+            const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+            const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+            const point = new THREE.Vector3();
+            object.traverse(node => { if (node.isSkinnedMesh) node.skeleton.update(); });
+            object.traverse(node => {
+                if (!node.isMesh || !node.geometry.attributes.position) return;
+                const positions = node.geometry.attributes.position;
+                for (let i = 0; i < positions.count; i++) {
+                    node.getVertexPosition(i, point);
+                    point.applyMatrix4(node.matrixWorld).applyMatrix4(inverse);
+                    min.min(point); max.max(point);
+                }
+            });
+            const center = min.clone().add(max).multiplyScalar(0.5);
+            const radius = min.distanceTo(max) * 0.5;
+            return Number.isFinite(radius) && radius > 0 ? { center, radius: radius * 1.18 } : { center: new THREE.Vector3(0, 0.325, 0), radius: 0.6 };
+        }
+        function configureDetachedFrame(recenter) {
+            if (!isDetached || !activeView || !sceneEl.camera) return;
+            const camera = sceneEl.camera;
+            const envelope = activeView.modelEnvelope || { center: new THREE.Vector3(0, 0.325, 0), radius: 0.6 };
+            const center = envelope.center.clone().multiplyScalar(currentScale)
+                .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(currentYaw));
+            const radius = envelope.radius * currentScale;
+            const halfV = THREE.MathUtils.degToRad(camera.fov) / 2;
+            const halfH = Math.atan(Math.tan(halfV) * camera.aspect);
+            const limitingSin = Math.sin(Math.min(halfV, halfH));
+            // 入场时取景；之后缩放必须真的改变画面大小，不能每次自动退远抵消缩放。
+            if (recenter || !detachedFitDistance) detachedFitDistance = Math.max(1.2, radius / (limitingSin * 0.68));
+            // 仅在接近画面边缘时后退，保留完整怪兽，避免放大后再次丢失。
+            const distance = Math.max(detachedFitDistance, radius / (limitingSin * 0.90));
+            const closest = Math.max(distance - radius, 0.01);
+            const upper = camera.far * 0.85 / (distance + radius);
+            detachedUnitScale = Math.min(Math.max(1, camera.near * 4 / closest), upper);
+            worldPosZ = -distance - center.z;
+            if (recenter) { worldPosX = -center.x; worldPosY = -center.y; }
+            const maxX = Math.max(0, closest * Math.tan(halfH) * 0.92 - radius);
+            const maxY = Math.max(0, closest * Math.tan(halfV) * 0.88 - radius);
+            worldPosX = THREE.MathUtils.clamp(worldPosX + center.x, -maxX, maxX) - center.x;
+            worldPosY = THREE.MathUtils.clamp(worldPosY + center.y, -maxY, maxY) - center.y;
+            detachedCameraSignature = [camera.near, camera.far, camera.fov, camera.aspect].join(',');
+        }
+        function updateDetachedFrame() {
+            const camera = sceneEl.camera;
+            if (!camera) return;
+            const signature = [camera.near, camera.far, camera.fov, camera.aspect].join(',');
+            if (signature !== detachedCameraSignature) configureDetachedFrame(false);
+            camera.updateWorldMatrix(true, false);
+            sceneEl.object3D.updateWorldMatrix(true, false);
+            detachedPosition.set(worldPosX, worldPosY, worldPosZ).multiplyScalar(detachedUnitScale);
+            detachedScale.setScalar(detachedUnitScale);
+            detachedLocalMatrix.compose(detachedPosition, detachedIdentity, detachedScale);
+            detachedParentInverse.copy(sceneEl.object3D.matrixWorld).invert();
+            const frame = worldAnchor.object3D;
+            frame.matrixAutoUpdate = false;
+            frame.matrix.copy(detachedParentInverse).multiply(camera.matrixWorld).multiply(detachedLocalMatrix);
+            frame.matrixWorldNeedsUpdate = true;
+        }
 
         let lossGraceTimer = null;
         let lossGraceDeadline = 0;
         let isDragging = false, isTouchingModel = false, startX = 0, startY = 0, initPinch = 0;
+        if (debugEnabled) setDebugEnabled(true);
 
         function clearLossGrace() {
             clearTimeout(lossGraceTimer);
@@ -304,7 +493,7 @@
             btnDetach.classList.toggle('active-detach', isDetached);
             scanGuide.innerText = isDetached
                 ? '现实合影模式：单指拖动位置/旋转，双指缩放'
-                : '请将镜头对准实体卡牌正面';
+                : '请将卡牌平放桌面，镜头对准正面';
             scanGuide.style.opacity = isDetached || !hasContent ? '1' : '0';
         }
 
@@ -356,7 +545,7 @@
             const root = view.root.object3D;
             if (!root.visible) return;
             if (isDetached) {
-                worldAnchor.object3D.updateMatrix();
+                updateDetachedFrame();
                 root.matrix.copy(worldAnchor.object3D.matrix);
             } else if (view.tracked) {
                 const targetMatrix = view.anchor.object3D.matrix;
@@ -381,7 +570,11 @@
         }
 
         AFRAME.registerComponent('card-visual-follow', {
-            tick: function () { updateCardVisuals(performance.now()); }
+            tick: function () {
+                const now = performance.now();
+                updateCardVisuals(now);
+                updateEnvironmentLight(now);
+            }
         });
         sceneEl.setAttribute('card-visual-follow', '');
 
@@ -400,12 +593,12 @@
                     power: 991,
                     desc: "专属奥义：【荒古共鸣·破界】—— 凝聚高维纯灵气场震碎空间屏障，造成无视护甲的巨兽威压。",
                     modelUrl: "./shisu_monster.glb",
-                    scale: 0.85, posX: 0, posY: 0, posZ: 0.005, rotX: 20, rotY: 0
+                    scale: 0.85, posX: 0, posY: 0, posZ: 0.005, rotX: 90, rotY: 0
                 }]);
             });
 
         function getBaseRotX() {
-            return isFlatTableMode ? 90 : (activeCardConfig && activeCardConfig.rotX !== undefined ? activeCardConfig.rotX : 20);
+            return 90; // 平放桌面专用，沿用已存在的平放变换。
         }
 
         function forEachMaterial(pivotEl, fn) {
@@ -449,8 +642,7 @@
                 const rOp = startRing + (ringTarget - startRing) * k;
                 if (ringEl) ringEl.setAttribute('material', 'opacity', rOp);
                 // CanvasTexture 是手动赋给 mesh 的；更新组件属性会把它当作空 src 重置。
-                const shadowMesh = shadowEl && shadowEl.getObject3D('mesh');
-                if (shadowMesh && shadowMesh.material) shadowMesh.material.opacity = rOp;
+                setContactShadowOpacity(shadowEl, rOp);
                 if (k < 1) {
                     requestAnimationFrame(step);
                 } else if (targetOpacity >= 1.0) {
@@ -460,17 +652,46 @@
             requestAnimationFrame(step);
         }
 
-        // 蓝色符文 / 发光眼睛材质：激活青色自发光，消除暗部死黑
+        // 仅把头部贴图中的蓝色眼部区域提取为发光掩码，不让整个灰色头部自发光。
+        function createEyeEmissionMask(texture) {
+            if (!texture || !texture.image) return null;
+            const image = texture.image;
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width; canvas.height = image.height;
+            const context = canvas.getContext('2d');
+            try {
+                context.drawImage(image, 0, 0);
+                const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < pixels.data.length; i += 4) {
+                    const red = pixels.data[i], green = pixels.data[i + 1], blue = pixels.data[i + 2];
+                    const value = Math.round(255 * THREE.MathUtils.clamp(((green + blue) / 2 - red * 1.1) / 50, 0, 1));
+                    pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = value;
+                    pixels.data[i + 3] = 255;
+                }
+                context.putImageData(pixels, 0, 0);
+                const mask = new THREE.CanvasTexture(canvas);
+                mask.flipY = texture.flipY;
+                mask.colorSpace = THREE.NoColorSpace;
+                mask.wrapS = texture.wrapS; mask.wrapT = texture.wrapT;
+                return mask;
+            } catch (error) {
+                debugLog('eye-mask-unavailable');
+                return null;
+            }
+        }
         function enhanceMaterial(m) {
-            m.side = THREE.DoubleSide;
-            m.roughness = 0.65;
-            m.metalness = 0.1;
+            if (!m.userData.spiritOriginal) m.userData.spiritOriginal = {
+                roughness: m.roughness, metalness: m.metalness, map: m.map,
+                normalMap: m.normalMap, roughnessMap: m.roughnessMap
+            };
             const isRuneArm = !!m.emissiveMap;
             const isHead = m.name === 'gray.002';
             if (isRuneArm || isHead) {
-                if (!m.emissiveMap && m.map) m.emissiveMap = m.map;
-                m.emissive = new THREE.Color(0x00f0ff);
-                m.emissiveIntensity = 0.6;
+                if (!m.emissiveMap && isHead) m.emissiveMap = createEyeEmissionMask(m.map);
+                if (m.emissiveMap) {
+                    m.emissive = new THREE.Color(0x00f0ff);
+                    m.emissiveIntensity = 0.6;
+                }
             }
             m.needsUpdate = true;
         }
@@ -526,6 +747,7 @@
 
                 // 0. 脚底半透明径向渐变接触阴影圆盘 (Contact Shadow)
                 const shadowDisk = document.createElement('a-circle');
+                shadowDisk.contactOpacity = 0.85;
                 shadowDisk.setAttribute('radius', '0.26');
                 shadowDisk.setAttribute('position', '0 0 0.002');
                 shadowDisk.setAttribute('material', 'shader: flat; transparent: true; opacity: 0.85; depthWrite: false; side: double');
@@ -555,7 +777,7 @@
                 const initScale = c.scale || 0.85;
                 const initPosY = c.posY !== undefined ? c.posY : 0;
                 const initPosZ = c.posZ !== undefined ? c.posZ : FOOT_Z;
-                const initRotX = c.rotX !== undefined ? c.rotX : 20;
+                const initRotX = 90;
                 pivot.setAttribute('position', `${c.posX || 0} ${initPosY} ${initPosZ}`);
                 pivot.setAttribute('rotation', `${initRotX} ${c.rotY || 0} 0`);
                 pivot.setAttribute('scale', `${initScale} ${initScale} ${initScale}`);
@@ -576,7 +798,13 @@
                         }
                     });
                     view.fadeReady = prepareFadeMaterials(obj3D).then(() => {
+                        // 先应用动画起始姿态；绑定姿态的包络可能比 Idle 小，不能用它取景。
+                        const animation = model.components['animation-mixer'];
+                        if (animation && animation.mixer) animation.mixer.update(0);
+                        view.modelEnvelope = measureModelEnvelope(obj3D);
                         model.setAttribute('visible', true);
+                        if (isDetached && activeView === view) { configureDetachedFrame(true); updateCardVisuals(performance.now()); }
+                        debugLog('model-ready');
                     });
                 });
 
@@ -589,6 +817,7 @@
                 anchor.addEventListener('targetFound', () => {
                     view.tracked = true;
                     if (activeView === view) isDetected = true;
+                    debugLog('target-found');
                     if (isDetached) return;
                     const isSameCard = activeView === view;
                     const wasVisible = isSameCard && visualRoot.object3D.visible;
@@ -640,6 +869,7 @@
                 anchor.addEventListener('targetLost', () => {
                     view.tracked = false;
                     if (activeView === view) isDetected = false;
+                    debugLog('target-lost');
                     if (isDetached) return;
                     if (activeView === view && visualRoot.object3D.visible) {
                         view.recovery = null;
@@ -674,6 +904,7 @@
                     activePivot.setAttribute('position', `${px} ${tweakY} ${tweakZ}`);
                 }
                 activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+                if (isDetached) configureDetachedFrame(false);
             }
         }
 
@@ -686,15 +917,6 @@
             sliderPosZ.value = FOOT_Z;
             sliderScale.value = activeCardConfig ? (activeCardConfig.scale || 0.85) : 0.85;
             applyTweakSliders();
-        });
-
-        // 切换【视角：竖拿卡面 / 平放桌面】
-        btnPose.addEventListener('click', () => {
-            isFlatTableMode = !isFlatTableMode;
-            btnPose.innerText = isFlatTableMode ? "视角：平放桌面" : "视角：竖拿卡面";
-            if (!isDetached && activePivot) {
-                activePivot.setAttribute('rotation', `${getBaseRotX()} ${currentYaw} 0`);
-            }
         });
 
         // 切换【踏入现实】合影模式
@@ -715,6 +937,8 @@
                 setModelOpacity(activePivot, 1.0);
                 activeRing.setAttribute('visible', false);
                 activeShadow.setAttribute('visible', false);
+                configureDetachedFrame(true);
+                updateCardVisuals(performance.now());
             } else {
                 worldAnchor.setAttribute('visible', 'false');
                 isDetected = activeView.tracked;
@@ -729,6 +953,7 @@
                 }
             }
             syncTrackingUI();
+            debugLog(isDetached ? 'detach-enter' : 'detach-return');
         });
 
         // 手势与鼠标交互
@@ -758,6 +983,7 @@
             sliderScale.value = currentScale;
             valScale.innerText = currentScale.toFixed(2);
             activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+            if (isDetached) configureDetachedFrame(false);
         });
 
         window.addEventListener('touchstart', (e) => {
@@ -790,6 +1016,7 @@
                 sliderScale.value = currentScale;
                 valScale.innerText = currentScale.toFixed(2);
                 activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+                if (isDetached) configureDetachedFrame(false);
             }
         });
 
@@ -810,7 +1037,7 @@
                 currentYaw = filterYaw.filter(currentYaw + dx * 0.4, performance.now());
                 worldPosX += dx * 0.002;
                 worldPosY -= dy * 0.002;
-                worldAnchor.setAttribute('position', `${worldPosX} ${worldPosY} ${worldPosZ}`);
+                configureDetachedFrame(false);
                 activePivot.setAttribute('rotation', `0 ${currentYaw} 0`);
             } else {
                 currentYaw = filterYaw.filter(currentYaw + dx * 0.5, performance.now());
