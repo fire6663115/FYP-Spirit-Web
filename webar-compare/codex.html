@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>怪兽图鉴 · THE SPIRIT</title>
+<link rel="stylesheet" href="./css/spirit-shell.css"><link rel="stylesheet" href="./css/spirit-codex.css">
+<script src="./js/spirit-data.js"></script><script src="./review-storage.js"></script><script src="./js/spirit-geometry.js"></script><script src="./js/spirit-viewer.js"></script></head>
+<body><main class="spirit-screen"><div class="codex-page">
+<header class="codex-header"><div><p class="codex-brand">THE SPIRIT</p><h1>怪兽图鉴</h1></div><a class="codex-back" href="./index.html">返回 AR 入口</a></header>
+<p id="codex-status" role="status">正在读取怪兽资料…</p>
+<p class="codex-storage">扫描实体卡牌解锁完整资料。进度仅存于此浏览器；清除网站数据或更换手机可能丢失。</p>
+<section id="codex-grid" class="codex-grid" aria-label="怪兽目录"></section>
+<section id="codex-detail" hidden><button id="codex-close" class="codex-back">返回目录</button>
+<h2 id="detail-title"></h2><div id="codex-model" aria-label="怪兽三维预览"></div><p id="model-status" role="status"></p>
+<div id="detail-fields"></div></section>
+</div></main><script src="./js/spirit-codex.js"></script></body></html>

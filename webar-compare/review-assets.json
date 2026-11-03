@@ -1,0 +1,14 @@
+{
+  "models": {
+    "original": "./shisu_monster.glb",
+    "a": "./models/candidate-a.glb",
+    "b": "./models/candidate-b.glb"
+  },
+  "geometryHelper": "./js/spirit-geometry.js",
+  "hashes": {
+    "original": "a3d053fedae20bc406425313b087f5f7a0ae4a28574fbd137848fed22fe8ffbc",
+    "a": "f3b840ba0fb3261170532dab2d8c43bc38d5236dcd9efb9df9c306a792f4be10",
+    "b": "8624c94a6b6542a21e0f3b58f5c68dd6d5cddcee175eb168abc268e2b483d751",
+    "targets": "7c93c2d036b7eb18a4d8e3955e1f8eaf6c72f14fa201688b6e5710d8bc08a779"
+  }
+}
