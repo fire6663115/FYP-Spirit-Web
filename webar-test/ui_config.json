@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "name": "THE SPIRIT UI 01",
+  "pages": {
+    "launch": {
+      "title": {
+        "x": 0,
+        "y": 0.85
+      }
+    }
+  }
+}

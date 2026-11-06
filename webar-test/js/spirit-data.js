@@ -6,7 +6,7 @@
  function newId(prefix='monster'){return prefix+'-'+(root.crypto?.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));}
  function assetPath(value,optional=false){
     if(optional&&!value)return '';
-    let decoded;try{decoded=decodeURIComponent(value);}catch(_){throw Error('资源路径编码无效。');}
+    let decoded;try{decoded=decodeURIComponent(typeof value==='string'?value.trim():value).trim();}catch(_){throw Error('资源路径编码无效。');}
     if(typeof value!=='string'||!value.trim()||/^(?:[a-z][a-z0-9+.-]*:|\/|\\)/i.test(decoded)||decoded.split(/[\\/]/).includes('..')||/[?#\x00-\x1f]/.test(decoded))throw Error('资源必须是项目内的相对文件路径，不能是电脑路径、临时 Blob 或外站地址。');
     return value.trim();
  }

@@ -65,7 +65,10 @@
  $('xr-place').addEventListener('click',()=>{wantPlace=true;if(reticle)reticle.visible=true;state.placed=false;});
  $('xr-end').addEventListener('click',()=>state.owner?.stop());
  const back=document.querySelector('#xr-overlay a[href="./index.html"]');
- back.addEventListener('click',async event=>{event.preventDefault();back.textContent='正在结束空间会话…';try{await state.owner?.stop({waitForPending:false});}finally{location.href='./index.html';}});
+ const exhibit=new URLSearchParams(location.search).get('exhibit')==='1';
+ const returnUrl=exhibit?'./index.html?exhibit=1':'./index.html';
+ if(exhibit){back.href=returnUrl;back.textContent='返回展览扫码';}
+ back.addEventListener('click',async event=>{event.preventDefault();back.textContent='正在结束空间会话…';try{await state.owner?.stop({waitForPending:false});}finally{location.href=returnUrl;}});
  $('xr-overlay').addEventListener('beforexrselect',event=>{if(event.target.closest('button,a'))event.preventDefault();});
  window.addEventListener('pagehide',()=>{state.owner?.stop();});
 })();

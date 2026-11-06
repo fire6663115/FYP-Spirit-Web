@@ -31,6 +31,10 @@
     catch(error){selected.close();if(token===version)$('model-status').textContent='模型暂不可用：'+error.message+'。文字资料仍可查看。';}
     return true;
  };
+ if(new URLSearchParams(location.search).get('exhibit')==='1'){
+    const back=document.querySelector('.codex-header .codex-back');
+    back.href='./index.html?exhibit=1';back.textContent='返回展览扫码';
+ }
  $('codex-close').addEventListener('click',()=>app.close());window.addEventListener('pagehide',()=>viewer?.close());
  window.addEventListener('storage',()=>{app.store=new SpiritData.UnlockStore(storage);if(!$('codex-detail').hidden)app.close();else app.render();});
  app.ready=SpiritData.load().then(data=>{app.catalog=data;app.render();return data;}).catch(error=>{$('codex-status').textContent=error.message;throw error;});

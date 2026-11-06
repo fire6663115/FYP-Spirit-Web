@@ -1,5 +1,20 @@
 # FYP Spirit WebAR 第三方组件与授权说明
 
+## 2026-11-03 M5～M6 增量记录
+
+本轮未安装新 npm/Python 包、解码器、付费 API、字体或外来美术。M5 本机诊断与候选生成算法为项目编写的集成代码。离线参数实验保存并执行了 MindAR **v1.2.5** 的原 OneEuroFilter 测试夹具；与 aframe/controller 源码证据放在 experiments/m5-m6/official/，同目录 MINDAR_LICENSE.txt 保留 MIT 原版权。不是把原项目来源不明的手势滤波代码自动认定为已解决。
+
+新增研究（均未引入网页）：
+
+| 项目 | 官方版本/兼容性证据 | 授权与决定 |
+| --- | --- | --- |
+| pmndrs/postprocessing | main 快照 a1f103559d15cf56cbcbb15d4373711b09418f3f，6.39.6 要求 Three >=.168 <.188，与扫描页 r158 不符；旧 6.35.0 声明 >=.152 <.163，但尚未实测 A-Frame/裁切/alpha/XR 集成 | **Zlib**，非 MIT；允许修改、公开分发、商用，禁止冒认来源，修改需标记，源码分发保留声明，无衍生代码公开要求。原文 licenses/postprocessing.txt。未安装任何版本。 |
+| @pmndrs/upscaler | main 快照 2020ea2640c547f594846632cb28c872ec308069，0.5.0 面向 WebGPURenderer/WGSL，Three peer >=.184，与现有 WebGL/r158 不符 | **MIT**，Copyright 2026 Dennis Smolek，另保留 AMD 2021–2023 MIT 衍生着色器声明；licenses/upscaler.txt。可改/分发/商用，保留声明，无本项目开源义务；未安装、未换引擎。 |
+| glTF-Transform | core 4.5.1，仍为下方已核查的 8e2a94a2616d293c4b503d0fb6a4b42e6ec7c62f | MIT，现有 licenses/gltf-transform.txt；只研究。CLI 及可选图像/Basis/KTX 编码器不是仅凭 core 许可即可全部批准，需单独审计依赖。 |
+| Three r158 KTX2Loader | 官方 r158 examples/jsm/loaders/KTX2Loader.js；实测 A-Frame THREE 中有类，但默认 GLTFLoader.ktx2Loader 为空 | Three 的 MIT 原文已保留。尚未接 setKTX2Loader、detectSupport 或部署转码 JS/WASM，因此不生成或使用需要解码的 KTX2 生产模型；后续还需审查所选 Basis 转码包及依赖。 |
+
+官方来源：https://github.com/pmndrs/postprocessing 、https://github.com/pmndrs/upscaler 、https://github.com/donmccurdy/glTF-Transform 、https://github.com/mrdoob/three.js/tree/r158 。本地已有 Blender 5.0.1（GPL）仅独立后台读取源 .blend 与 GLB，未保存源文件、复制 Blender 代码或分发 Blender；新增候选由本项目脚本写入独立 GLB，不改生产资产。Pillow 沿用已有 MIT-CMU 许可。既有素材权利和完整 CDN 传递依赖未决项仍保留。
+
 检查日期：2026-11-01。此文件记录实际引用的软件、许可证和仍需确认的来源；不替素材作者授予许可。许可证原文在 `licenses/`，公开发布本扫描页时应一同保留此文件及相关原文。
 
 2026-11-02 M1～M4 更新：新增启动、性能保护、裁切召唤、资料/图鉴、照片合成及 XR 会话模块均为本项目新编写的集成代码；没有安装新库、付费 API、字体或网络美术。图鉴和独立 XR 实验页按需复用已经核对的 A-Frame 1.5.0 内的 Three.js r158 / GLTFLoader（MIT）。WebXR、Hit Test、可选 Anchors、Canvas、MediaStream 和本地存储是浏览器接口，不是额外复制的第三方 SDK。M1～M4 没有运行 Blender 转换、修改 FBX/.blend/生产 GLB，也没有安装人像分割模型。以下软件版本及原文继续保留；间接依赖与素材授权未确认项仍有效。

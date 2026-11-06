@@ -13,6 +13,7 @@
     <script src="./js/spirit-data.js"></script>
     <script src="./js/spirit-reality.js"></script>
     <script src="./js/spirit-photo.js"></script>
+    <script src="./js/spirit-diagnostics.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
@@ -737,11 +738,11 @@
                     ? renderer.compileAsync(obj3D, sceneEl.camera, sceneEl.object3D)
                     : renderer.compile(obj3D, sceneEl.camera, sceneEl.object3D);
                 await compile();
-                if(document.hidden||(window.SpiritApp&&!SpiritApp.canRender()))return;
+                if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))return;
                 await warmDraw();
                 originalFlags.forEach((_,material)=>{material.transparent=true;material.needsUpdate=true;});
                 await compile();
-                if(document.hidden||(window.SpiritApp&&!SpiritApp.canRender()))return;
+                if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))return;
                 await warmDraw();
             } catch (error) {
                 console.warn('淡出材质预编译失败，将按需编译:', error);
@@ -813,6 +814,7 @@
                 anchor.addEventListener('targetFound', () => {
                     if(window.SpiritApp && SpiritApp.mode!=='ar')return;
                     if(!anchor.components['mindar-image-target']?.postMatrix)return;
+                    SpiritDiagnostics.mark('target_found',{monsterId:c.monsterId});
                     view.tracked = true;
                     if (activeView === view) isDetected = true;
                     debugLog('target-found');
@@ -867,6 +869,7 @@
 
                 // 目标离开视野（开启 1.5 秒宽限期保护）
                 anchor.addEventListener('targetLost', () => {
+                    SpiritDiagnostics.mark('target_lost',{externalGraceMs:LOST_GRACE_MS});
                     view.tracked = false;
                     if(!isDetached)view.summon.lost();
                     if (activeView === view) isDetected = false;
@@ -908,7 +911,8 @@
             view.model.remove();disposeModel(mesh);view.model=null;view.modelEnvelope=null;view.rejectLoad=null;
         }
         function ensureViewModel(view) {
-            if(view.model)return view.fadeReady;
+            if(view.model){SpiritDiagnostics.mark('model_cache_hit',{ready:!!view.modelEnvelope,monsterId:view.config.monsterId});return view.fadeReady;}
+            SpiritDiagnostics.mark('glb_load_start',{monsterId:view.config.monsterId});
             // A mobile memory budget: keep only the currently needed GLB resident.
             cardViews.forEach(other=>{if(other!==view)evictViewModel(other);});
             const model=document.createElement('a-gltf-model'),version=++view.loadVersion;
@@ -918,23 +922,27 @@
                 view.rejectLoad=reject;
                 model.addEventListener('model-error',()=>reject(Error('怪兽模型加载失败，请检查网络和模型路径。')),{once:true});
                 model.addEventListener('model-loaded',async()=>{
+                    SpiritDiagnostics.mark('glb_model_loaded');SpiritDiagnostics.resource(view.config.modelUrl);
                     const object=model.getObject3D('mesh');
                     try {
                         if(view.loadVersion!==version){disposeModel(object);throw new DOMException('已取消','AbortError');}
-                        if(document.hidden||(window.SpiritApp&&!SpiritApp.canRender()))throw new DOMException('AR 已暂停','AbortError');
+                        if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))throw new DOMException('AR 已暂停','AbortError');
                         SpiritSummon.prepare(view,object,sceneEl.renderer);
                         object.traverse(node=>{if(node.isMesh)(Array.isArray(node.material)?node.material:[node.material]).forEach(enhanceMaterial);});
                         const clips=object.animations||[];
                         const idle=clips.find(clip=>clip.name.toLowerCase()==='idle')||clips[0];
                         if(idle)model.setAttribute('animation-mixer','clip',idle.name);
+                        SpiritDiagnostics.mark('material_prepare_start');
                         await prepareFadeMaterials(object);
+                        SpiritDiagnostics.mark('material_prepare_complete');
                         if(view.loadVersion!==version){disposeModel(object);throw new DOMException('已取消','AbortError');}
-                        if(document.hidden||(window.SpiritApp&&!SpiritApp.canRender()))throw new DOMException('AR 已暂停','AbortError');
+                        if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))throw new DOMException('AR 已暂停','AbortError');
                         const animation=model.components['animation-mixer'];if(animation?.mixer)animation.mixer.setTime(0);
                         view.modelEnvelope=measureModelEnvelope(object);
                         model.setAttribute('visible',true);view.rejectLoad=null;
                         if(isDetached&&activeView===view){configureDetachedFrame(true);updateCardVisuals(performance.now());}
                         debugLog('model-ready');resolve(view);
+                        SpiritDiagnostics.mark('model_ready',{monsterId:view.config.monsterId});
                     }catch(error){
                         if(error.name==='AbortError'&&view.model===model){model.remove();disposeModel(object);view.model=null;view.modelEnvelope=null;view.rejectLoad=null;}
                         reject(error);
@@ -1161,6 +1169,8 @@
             }, 150);
         });
     </script>
-    <script src="./js/spirit-app.js"></script>
+    <script src="./js/spirit-app.js?v=m16-1"></script>
+<script src="./js/spirit-ui-theme.js?v=m16-1"></script>
+<script src="./js/spirit-ui-runtime.js?v=m16-1" data-page="scanner"></script>
 </body>
 </html>
