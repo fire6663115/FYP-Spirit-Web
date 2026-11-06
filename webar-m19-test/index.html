@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     <script src="./js/spirit-geometry.js"></script>
     <script src="./js/spirit-summon.js"></script>
-    <script src="./js/spirit-data.js"></script>
+    <script src="./js/spirit-data.js?v=m19-shared-1"></script>
     <script src="./js/spirit-reality.js"></script>
     <script src="./js/spirit-photo.js"></script>
     <script src="./js/spirit-diagnostics.js"></script>
@@ -168,7 +168,7 @@
     <!-- 预设静态 mindar-image-target 锚点，确保 MindAR 初始化时 100% 同步注册 setupMarker -->
     <a-scene
         id="ar-scene"
-        mindar-image="autoStart: false; uiLoading: no; uiScanning: no; uiError: no; imageTargetSrc: ./card_targets.mind; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 60; warmupTolerance: 3;"
+        mindar-image="autoStart: false; uiLoading: no; uiScanning: no; uiError: no; imageTargetSrc: ../webar-m18-test/card_targets.mind; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 60; warmupTolerance: 3;"
         color-space="sRGB"
         renderer="colorManagement: true; physicallyCorrectLights: false"
         vr-mode-ui="enabled: false"

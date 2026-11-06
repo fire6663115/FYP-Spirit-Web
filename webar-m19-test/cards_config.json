@@ -1,5 +1,5 @@
 {
-  "mindFile": "./card_targets.mind",
+  "mindFile": "../webar-m18-test/card_targets.mind",
   "cards": [
     {
       "scale": 0.85,
@@ -15,7 +15,7 @@
       "tier": "奥秘级 (Tier 7)",
       "power": 991,
       "desc": "荒古共鸣·破界：凝聚高维纯灵气场震碎空间屏障，造成无视护甲的巨兽威压。",
-      "modelUrl": "./shisu_monster.glb"
+      "modelUrl": "../webar-m18-test/shisu_monster.glb"
     }
   ],
   "monsters": [
@@ -32,11 +32,11 @@
           "description": "凝聚高维纯灵气场震碎空间屏障，造成无视护甲的巨兽威压。"
         }
       ],
-      "cardImage": "./card_sample.png",
+      "cardImage": "../webar-m18-test/card_sample.png",
       "world": {},
       "id": "shisu",
       "nameZh": "释宿",
-      "modelUrl": "./shisu_monster.glb",
+      "modelUrl": "../webar-m18-test/shisu_monster.glb",
       "realityHeightProvisional": true
     }
   ],

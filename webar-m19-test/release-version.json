@@ -1,18 +1,16 @@
 {
-  "version": "m19-phone-2ca15af11dc2",
+  "version": "m19-phone-f1071a4bb967",
   "files": {
     "THIRD_PARTY_NOTICES.md": "b1278dd73a2aa4f434bbe5ec658d4b20bfc95201ef1e0a7b9c34489d96fd7368",
-    "card_sample.png": "d8907522ad3be7de01d8973d6c0bdb8ad4d986421bc81b88700d09dc1ef2877e",
-    "card_targets.mind": "7c93c2d036b7eb18a4d8e3955e1f8eaf6c72f14fa201688b6e5710d8bc08a779",
-    "cards_config.json": "252783720acb8cc240f08df68e991b7f16e1cf413bcb9fb8dbc23f8430d0a075",
-    "codex.html": "62c7e21d0b234496bcc17a789f01504e0cb824d7a63cae202f3a7cacc8fac344",
+    "cards_config.json": "42be196efeec7c0b41124f7da85342564d6132c79a401917dcaf56ec58b8372b",
+    "codex.html": "339240700e0b22b5b619dc8124149b407923965d9dfd92d6906c6989d5b9a8f6",
     "css/spirit-codex.css": "064d7440f9ab31ac68060756b79fb66dabccbf4c01576eba4dad214d09dc6ec9",
     "css/spirit-shell.css": "dd677bf402d3b49f91d98cd3679c5be31042ec6da89b14bb0d3cb657ccfeb34e",
     "css/spirit-xr-m18.css": "d9e17af7aa9e5475cd3278cd9a0c992d1fae4918e981a94ef2c8b3709f184d53",
-    "index.html": "1584fb1fa0109da5149a03725685d2368baf0ead43399fb412d436df20444839",
+    "index.html": "d656f14f28c98257c24d6314039ccbec1f5a877a9d14f5af535bd2b1810c0130",
     "js/spirit-app.js": "7a0622c019e8b371eea207069aa2d3a7d4af04cc5ac5eefea26c489e2346f99c",
     "js/spirit-codex.js": "ab61861b2bdb11809de00d1fd575f5dc8f14b818b7f8232af497351e8a5e5f8e",
-    "js/spirit-data.js": "28f66522be8bf1d5e84008dc4d5d85e274d440b089e4f4388feb0f7e3fb9592c",
+    "js/spirit-data.js": "4240d7615feb9bdaa11b39ce3f69847182a6910ec43b5bef7b7d7e2920e42784",
     "js/spirit-diagnostics.js": "3d166a087f914a9ba2956d9200214b0ec9b4eda86e880e3d5ec5f08ccf9f22bb",
     "js/spirit-geometry.js": "87d0f70ae30a607e170b53ca46304ffe7a152cebfa3d0853471d697dfbc620b4",
     "js/spirit-m19-phone-compare.js": "20a61b8713a7b1b7dcce6126482996db52890a93fbce024db5bc6ee3eccfd29a",
@@ -43,8 +41,21 @@
     "licenses/three128.txt": "7dddf7c5b8fd10ee654db8857d75d104b5557889aa5a91fc4ca545ea7c07062f",
     "licenses/tinyqueue.txt": "780453e05abdc22307ee01c706a2e73f508d3e484fc4c804485ebf6fe0964694",
     "licenses/upscaler.txt": "00ecf3d375e74aee1f5d1461699a5b4e2930222eecfcbaaffa21ac6d4d58ac65",
-    "shisu_monster.glb": "a3d053fedae20bc406425313b087f5f7a0ae4a28574fbd137848fed22fe8ffbc",
     "ui_config.json": "28c7924f565de159d16109165bae93262880d9afbb5175ec236f64a292493d6b",
-    "xr.html": "ba7d04955431798fbab58b5ee7c1a25850b235297df7b8532bb8f1a2e4fe5565"
+    "xr.html": "102c7253ae6a83a161350763acdab4d74039de01bff7712478cc7e4baac72fb0"
+  },
+  "shared": {
+    "../webar-m18-test/shisu_monster.glb": {
+      "sha256": "a3d053fedae20bc406425313b087f5f7a0ae4a28574fbd137848fed22fe8ffbc",
+      "size": 20020160
+    },
+    "../webar-m18-test/card_targets.mind": {
+      "sha256": "7c93c2d036b7eb18a4d8e3955e1f8eaf6c72f14fa201688b6e5710d8bc08a779",
+      "size": 615748
+    },
+    "../webar-m18-test/card_sample.png": {
+      "sha256": "d8907522ad3be7de01d8973d6c0bdb8ad4d986421bc81b88700d09dc1ef2877e",
+      "size": 867423
+    }
   }
 }
