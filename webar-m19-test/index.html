@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>THE SPIRIT · 卡牌 WebAR</title>
+    <link rel="stylesheet" href="./css/spirit-shell.css">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <script src="./js/spirit-geometry.js"></script>
+    <script src="./js/spirit-summon.js"></script>
+    <script src="./js/spirit-data.js"></script>
+    <script src="./js/spirit-reality.js"></script>
+    <script src="./js/spirit-photo.js"></script>
+    <script src="./js/spirit-diagnostics.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body { overflow: hidden; font-family: "Microsoft YaHei", sans-serif; background: #000; }
+
+        #scan-guide {
+            position: fixed; top: 10%; left: 50%; transform: translateX(-50%);
+            background: rgba(10, 20, 35, 0.85); border: 1px solid rgba(0, 240, 255, 0.6);
+            border-radius: 20px; padding: 8px 18px; color: #00f0ff; font-size: 13px;
+            z-index: 100; pointer-events: none; box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+            transition: opacity 0.3s ease; white-space: nowrap;
+        }
+
+        #top-right-tools {
+            position: fixed; top: 20px; right: 16px; z-index: 110;
+            display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+        }
+
+        .tool-pill {
+            background: rgba(15, 23, 42, 0.9); border: 1px solid #00f0ff;
+            color: #00f0ff; text-decoration: none; font-size: 12px; font-weight: bold;
+            padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .tool-pill.tweak-btn { border-color: #ffd166; color: #ffd166; }
+
+        /* 屏幕侧边实时站位微调浮窗 */
+        #tweak-panel {
+            position: fixed; top: 96px; right: 16px; width: 210px;
+            background: rgba(8, 18, 34, 0.82); border: 1px solid rgba(255, 209, 102, 0.6);
+            border-radius: 10px; padding: 10px 12px; color: #f8fafc; z-index: 120;
+            backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+            display: none;
+        }
+        #tweak-panel.open { display: block; }
+        .tweak-row { margin-bottom: 8px; font-size: 11px; }
+        .tweak-label { display: flex; justify-content: space-between; color: #ffd166; margin-bottom: 2px; font-weight: 600; }
+        .tweak-slider { width: 100%; accent-color: #00f0ff; cursor: pointer; }
+        #btn-tweak-reset {
+            width: 100%; margin-top: 4px; padding: 4px 0; font-size: 11px;
+            background: rgba(0, 240, 255, 0.15); border: 1px solid #00f0ff;
+            color: #00f0ff; border-radius: 4px; cursor: pointer;
+        }
+
+        #hud-panel {
+            position: fixed; top: 20px; left: 16px; right: 135px;
+            background: linear-gradient(135deg, rgba(8, 20, 38, 0.9), rgba(4, 10, 20, 0.95));
+            border-left: 4px solid #00f0ff; border-radius: 8px; padding: 12px 16px;
+            color: #ffffff; z-index: 100; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            opacity: 0; transform: translateY(-12px); pointer-events: none;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #hud-panel.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .hud-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .monster-title { font-size: 18px; font-weight: 700; color: #00f0ff; letter-spacing: 1px; }
+        .monster-tier { font-size: 11px; font-weight: 600; color: #ffb703; background: rgba(255, 183, 3, 0.15); border: 1px solid rgba(255, 183, 3, 0.6); padding: 2px 6px; border-radius: 4px; }
+        .spirit-power-bar { font-size: 13px; color: #52b788; font-weight: 600; margin-bottom: 4px; }
+        .skill-box { font-size: 11px; color: #cbd5e1; line-height: 1.4; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 5px; }
+
+        #action-bar {
+            position: fixed; bottom: 28px; left: 0; right: 0;
+            display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; z-index: 100;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease; padding: 0 12px;
+        }
+        #action-bar.active { opacity: 1; pointer-events: auto; }
+        .hud-btn {
+            background: rgba(0, 240, 255, 0.15); color: #00f0ff;
+            border: 1.5px solid #00f0ff; border-radius: 25px; padding: 10px 16px;
+            font-size: 13px; font-weight: 600; backdrop-filter: blur(8px);
+            cursor: pointer; box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+        }
+        .hud-btn.detach-mode { border-color: #ffd166; color: #ffd166; background: rgba(255, 209, 102, 0.15); }
+        .hud-btn.detach-mode.active-detach { border-color: #06d6a0; color: #06d6a0; background: rgba(6, 214, 160, 0.2); }
+
+        #shutter-flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none; z-index: 200;
+            transition: opacity 0.08s ease-out;
+        }
+        #ar-debug-panel { position: fixed; left: 8px; bottom: 150px; z-index: 130; max-width: 95vw; max-height: 210px; overflow: auto; background: #07121fee; color: #b8ffd8; padding: 8px; font: 10px/1.4 monospace; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
+    </style>
+<link rel="stylesheet" href="./css/spirit-xr-m18.css"></head>
+<body data-app-mode="home">
+    <main id="launch-screen" class="spirit-screen" data-spirit-ui>
+        <div class="spirit-entry">
+            <h1 class="spirit-title">THE<br>SPIRIT</h1>
+            <p>让实体卡牌中的灵兽，出现在眼前。</p>
+            <div class="spirit-entry-actions">
+                <button id="btn-start-ar" class="spirit-primary">开始 AR</button>
+                <button id="btn-open-codex" class="spirit-secondary">怪兽图鉴</button>
+                <button id="btn-reload-ar" class="spirit-secondary" hidden>重新加载并重试</button>
+            </div>
+            <p>开始后将请求摄像头权限，仅用于本机识别与合影。请在安全环境下使用，避免边走边看手机。</p>
+            <p id="launch-status" class="spirit-status" role="status">把卡牌平放，在安全的环境中开始。</p>
+        </div>
+    </main>
+    <nav id="session-nav" aria-label="AR 会话" data-spirit-ui>
+        <button id="btn-exit-ar">退出 AR</button><button id="btn-session-codex">图鉴</button>
+        <select id="quality-select" aria-label="画质"><option value="auto">自动画质</option><option value="high">高画质</option><option value="standard">标准画质</option><option value="economy">省电画质</option></select>
+    </nav>
+    <span id="performance-readout" aria-live="off"></span>
+    <aside id="system-notice" hidden data-spirit-ui><span id="notice-text"></span><button id="btn-notice-exit">退出 AR</button></aside>
+
+    <div id="scan-guide">请将卡牌平放桌面，镜头对准正面</div>
+
+    <div id="top-right-tools">
+        <button id="btn-tweak-toggle" class="tool-pill tweak-btn">🎯 站位微调</button>
+        <button id="btn-light-toggle" class="tool-pill">环境光：开（近似）</button>
+        <button id="btn-debug-toggle" class="tool-pill" hidden>调试：开</button>
+    </div>
+
+    <!-- 屏幕内实时站位微调器 -->
+    <div id="tweak-panel">
+        <div class="tweak-row">
+            <div class="tweak-label"><span>卡面前后 (Y)</span><span id="val-pos-y">0.00</span></div>
+            <input type="range" class="tweak-slider" id="slider-pos-y" min="-0.45" max="0.45" step="0.01" value="0">
+        </div>
+        <div class="tweak-row">
+            <div class="tweak-label"><span>脚底高度 (Z)</span><span id="val-pos-z">0.005</span></div>
+            <input type="range" class="tweak-slider" id="slider-pos-z" min="-0.25" max="0.25" step="0.005" value="0.005">
+        </div>
+        <div class="tweak-row">
+            <div class="tweak-label"><span>体型缩放 (Scale)</span><span id="val-scale">0.85</span></div>
+            <input type="range" class="tweak-slider" id="slider-scale" min="0.15" max="1.80" step="0.02" value="0.85">
+        </div>
+        <button id="btn-tweak-reset">重置回卡面中心 (0, 0)</button>
+    </div>
+
+    <div id="hud-panel">
+        <div class="hud-row">
+            <span class="monster-title" id="ui-name">释宿 (Shi Su)</span>
+            <span class="monster-tier" id="ui-tier">奥秘级 (Tier 7)</span>
+        </div>
+        <div class="spirit-power-bar" id="ui-power">纯灵值 (Spirit Power)：991</div>
+        <div class="skill-box" id="ui-desc">
+            专属奥义：【荒古共鸣·破界】—— 凝聚高维纯灵气场震碎空间屏障，造成无视护甲的巨兽威压。
+        </div>
+    </div>
+
+    <div id="action-bar">
+        <button class="hud-btn detach-mode" id="btn-detach">近似合影</button>
+        <button type="button" class="hud-btn" id="btn-xr-m18">踏入现实 · 空间 AR</button>
+        <button class="hud-btn" id="btn-snap">AR 合影拍照</button>
+        <button class="hud-btn" id="btn-full">全屏</button>
+    </div>
+
+    <div id="shutter-flash"></div>
+    <aside id="reality-panel" hidden data-spirit-ui><strong id="reality-height-label"></strong><p>近似合影：没有真实空间定位，走近或绕行不会产生可靠的空间透视。</p><div class="reality-controls"><label for="reality-distance">构图距离（近似米）</label><input id="reality-distance" type="number" min="0.5" step="any" value="5"><button id="btn-spatial-ar">空间 AR（实验）</button></div></aside>
+    <section id="photo-preview" hidden data-spirit-ui><img id="photo-image" alt="本机生成的怪兽合影"><p>照片只在本机生成。点击保存；若浏览器未下载，可长按图片保存。</p><div><a id="photo-save">保存照片</a> <button id="photo-close">返回 AR</button></div></section>
+    <pre id="ar-debug-panel" hidden></pre>
+
+    <!-- 预设静态 mindar-image-target 锚点，确保 MindAR 初始化时 100% 同步注册 setupMarker -->
+    <a-scene
+        id="ar-scene"
+        mindar-image="autoStart: false; uiLoading: no; uiScanning: no; uiError: no; imageTargetSrc: ./card_targets.mind; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 60; warmupTolerance: 3;"
+        color-space="sRGB"
+        renderer="colorManagement: true; physicallyCorrectLights: false"
+        vr-mode-ui="enabled: false"
+        device-orientation-permission-ui="enabled: false">
+
+        <a-camera position="0 0 0" near="0.01" look-controls="enabled: false"></a-camera>
+        <a-light id="ambient-light" type="ambient" color="#ffffff" intensity="0.4"></a-light>
+        <a-light id="key-light" type="directional" color="#ffffff" intensity="1.325" position="1 2.5 1.5"></a-light>
+        <a-light id="fill-light" type="directional" color="#ffffff" intensity="0.23" position="-2 1 0.5"></a-light>
+
+        <!-- 静态预置主卡牌锚点 (避免异步 fetch 晚于 MindAR _startAR 导致 postMatrix 为空无法识别) -->
+        <a-entity id="preset-anchor-0" mindar-image-target="targetIndex: 0"></a-entity>
+
+        <a-entity id="world-anchor" position="0 -0.25 -1.2" visible="false"></a-entity>
+    </a-scene>
+
+    <script>
+        // ====================================================================
+        // GitHub 经典 1€ Filter (OneEuroFilter) 自适应低通防抖算法实现
+        // ====================================================================
+        class LowPassFilter {
+            constructor(alpha, initVal = 0) {
+                this.y = initVal;
+                this.s = initVal;
+                this.initialized = false;
+                this.setAlpha(alpha);
+            }
+            setAlpha(alpha) {
+                this.alpha = Math.min(Math.max(alpha, 0.0001), 1.0);
+            }
+            filter(value) {
+                if (!this.initialized) {
+                    this.s = value;
+                    this.y = value;
+                    this.initialized = true;
+                    return value;
+                }
+                this.s = this.alpha * value + (1.0 - this.alpha) * this.s;
+                this.y = value;
+                return this.s;
+            }
+            lastValue() { return this.y; }
+            reset() { this.initialized = false; }
+        }
+
+        class OneEuroFilter {
+            constructor(freq = 60, minCutoff = 1.0, beta = 0.01, dCutoff = 1.0) {
+                this.freq = freq;
+                this.minCutoff = minCutoff;
+                this.beta = beta;
+                this.dCutoff = dCutoff;
+                this.x = new LowPassFilter(this.alpha(minCutoff));
+                this.dx = new LowPassFilter(this.alpha(dCutoff));
+                this.lastTime = null;
+            }
+            alpha(cutoff) {
+                const te = 1.0 / this.freq;
+                const tau = 1.0 / (2 * Math.PI * cutoff);
+                return 1.0 / (1.0 + tau / te);
+            }
+            filter(value, timestamp = null) {
+                if (this.lastTime !== null && timestamp !== null && timestamp > this.lastTime) {
+                    this.freq = 1000.0 / (timestamp - this.lastTime);
+                }
+                this.lastTime = timestamp;
+                const dValue = !this.x.initialized ? 0.0 : (value - this.x.lastValue()) * this.freq;
+                const edValue = this.dx.filter(dValue);
+                const cutoff = this.minCutoff + this.beta * Math.abs(edValue);
+                this.x.setAlpha(this.alpha(cutoff));
+                return this.x.filter(value);
+            }
+            reset() {
+                this.x.reset();
+                this.dx.reset();
+                this.lastTime = null;
+            }
+        }
+
+        // 生成脚底径向渐变接触阴影 Canvas 纹理 (使用 Three.CanvasTexture 避免 A-Frame 分号解析冲突)
+        function createContactShadowCanvas() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(64, 64, 6, 64, 64, 62);
+            grad.addColorStop(0.0, 'rgba(0, 8, 20, 0.78)');
+            grad.addColorStop(0.55, 'rgba(0, 20, 40, 0.38)');
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 128, 128);
+            return canvas;
+        }
+        const CONTACT_SHADOW_SRC = createContactShadowCanvas();
+
+        // 仅本机内存中的 24x18 采样；不推断真实光源方向，不存图、不上传。
+        const environmentLight = {
+            enabled: new URLSearchParams(location.search).get('lighting') !== 'off',
+            canvas: document.createElement('canvas'), context: null,
+            brightness: 0.5, targetBrightness: 0.5, tint: [1, 1, 1], targetTint: [1, 1, 1],
+            shadowFactor: 0.825, lastUpdate: null, lastSample: -Infinity, sampleCount: 0, sampleError: false
+        };
+        environmentLight.canvas.width = 24; environmentLight.canvas.height = 18;
+        environmentLight.context = environmentLight.canvas.getContext('2d', { willReadFrequently: true });
+
+        function estimateCameraLight(data) {
+            let red = 0, green = 0, blue = 0, count = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 16) continue;
+                red += data[i]; green += data[i + 1]; blue += data[i + 2]; count++;
+            }
+            if (!count) return { brightness: 0.5, tint: [1, 1, 1] };
+            red /= count; green /= count; blue /= count;
+            const mean = Math.max((red + green + blue) / 3, 1);
+            const tint = [red, green, blue].map(channel => THREE.MathUtils.clamp(1 + (channel / mean - 1) * 0.12, 0.92, 1.08));
+            return { brightness: (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255, tint };
+        }
+        function setEnvironmentTarget(estimate) {
+            environmentLight.targetBrightness = THREE.MathUtils.clamp(estimate.brightness, 0.08, 0.95);
+            environmentLight.targetTint = estimate.tint.map(value => THREE.MathUtils.clamp(value, 0.92, 1.08));
+        }
+        function setEnvironmentEnabled(enabled) {
+            environmentLight.enabled = !!enabled;
+            if (!enabled) setEnvironmentTarget({ brightness: 0.5, tint: [1, 1, 1] });
+            const button = document.getElementById('btn-light-toggle');
+            button.textContent = enabled ? '环境光：开（近似）' : '环境光：关';
+        }
+        function sampleEnvironmentLight(now, source) {
+            if (!environmentLight.enabled || document.hidden || !source || now - environmentLight.lastSample < (environmentLight.sampleMs || 500)) return;
+            if (source.tagName === 'VIDEO' && (source.readyState < 2 || !source.videoWidth)) return;
+            if (source.tagName !== 'VIDEO' && source.tagName !== 'CANVAS') return;
+            environmentLight.lastSample = now;
+            const context = environmentLight.context;
+            if (!context) return;
+            try {
+                context.drawImage(source, 0, 0, 24, 18);
+                const pixels = context.getImageData(0, 0, 24, 18).data;
+                setEnvironmentTarget(estimateCameraLight(pixels));
+                environmentLight.sampleCount++;
+            } catch (error) {
+                if (!environmentLight.sampleError) debugLog('light-sample-unavailable');
+                environmentLight.sampleError = true;
+            } finally {
+                context.clearRect(0, 0, 24, 18);
+            }
+        }
+        function setContactShadowOpacity(shadow, baseOpacity) {
+            if (!shadow) return;
+            shadow.contactOpacity = baseOpacity;
+            const mesh = shadow.getObject3D('mesh');
+            if (mesh && mesh.material) mesh.material.opacity = baseOpacity * environmentLight.shadowFactor * (shadow.summonOpacity ?? 1);
+        }
+        function updateEnvironmentLight(now, source = document.querySelector('video')) {
+            if (document.hidden) { environmentLight.lastUpdate = now; return; }
+            if (activeView && activeView.root.object3D.visible) sampleEnvironmentLight(now, source);
+            const dt = environmentLight.lastUpdate === null ? 0 : THREE.MathUtils.clamp(now - environmentLight.lastUpdate, 0, 250);
+            environmentLight.lastUpdate = now;
+            const alpha = 1 - Math.exp(-dt / 1500);
+            environmentLight.brightness += (environmentLight.targetBrightness - environmentLight.brightness) * alpha;
+            environmentLight.tint = environmentLight.tint.map((value, i) => value + (environmentLight.targetTint[i] - value) * alpha);
+            const b = environmentLight.brightness;
+            const intensities = [0.22 + 0.36 * b, 0.75 + 1.15 * b, (0.12 + 0.22 * b) * (environmentLight.fillFactor ?? 1)];
+            ['ambient-light', 'key-light', 'fill-light'].forEach((id, i) => {
+                const light = document.getElementById(id).getObject3D('light');
+                if (!light) return;
+                light.intensity = intensities[i];
+                light.color.setRGB(...environmentLight.tint);
+            });
+            environmentLight.shadowFactor = 0.65 + 0.35 * b;
+            cardViews.forEach(view => setContactShadowOpacity(view.shadow, view.shadow.contactOpacity ?? 0.85));
+        }
+
+        const sceneEl = document.getElementById('ar-scene');
+        const worldAnchor = document.getElementById('world-anchor');
+        const scanGuide = document.getElementById('scan-guide');
+        const hudPanel = document.getElementById('hud-panel');
+        const actionBar = document.getElementById('action-bar');
+        const btnDetach = document.getElementById('btn-detach');
+        const btnSnap = document.getElementById('btn-snap');
+        const shutterFlash = document.getElementById('shutter-flash');
+        document.getElementById('btn-light-toggle').addEventListener('click', () => setEnvironmentEnabled(!environmentLight.enabled));
+        setEnvironmentEnabled(environmentLight.enabled);
+
+        const btnTweakToggle = document.getElementById('btn-tweak-toggle');
+        const tweakPanel = document.getElementById('tweak-panel');
+        const sliderPosY = document.getElementById('slider-pos-y');
+        const sliderPosZ = document.getElementById('slider-pos-z');
+        const sliderScale = document.getElementById('slider-scale');
+        const valPosY = document.getElementById('val-pos-y');
+        const valPosZ = document.getElementById('val-pos-z');
+        const valScale = document.getElementById('val-scale');
+        const btnTweakReset = document.getElementById('btn-tweak-reset');
+
+        const uiName = document.getElementById('ui-name');
+        const uiTier = document.getElementById('ui-tier');
+        const uiPower = document.getElementById('ui-power');
+        const uiDesc = document.getElementById('ui-desc');
+
+        const LOST_GRACE_MS = 1500;      // 丢失宽限时长
+        const GHOST_OPACITY = 0.5;       // 宽限期半透明度
+        const LOST_FADE_MS = 300;        // 丢失时渐隐时长
+        const FOUND_FADE_MS = 200;       // 重新捕获时平滑吸附时长
+        const FOOT_Z = 0.005;            // 卡面接触高度，旧法阵已取消
+
+        let activePivot = null;
+        let activeAnchor = null;
+        let activeRing = null;
+        let activeShadow = null;
+        let activeCardConfig = null;
+        let activeView = null;
+        const cardViews = [];
+        let isDetected = false;
+        let isDetached = false;
+        let currentYaw = 0;
+        let currentScale = 0.85;
+        let tweakY = 0.0;
+        let tweakZ = FOOT_Z;
+        let worldPosX = 0, worldPosY = -0.25, worldPosZ = -1.2;
+        let detachedUnitScale = 1;
+        const realitySettings={heightM:3,distanceM:5,modelScale:1};
+        let detachedCameraSignature = '';
+        const detachedLocalMatrix = new THREE.Matrix4();
+        const detachedParentInverse = new THREE.Matrix4();
+        const detachedIdentity = new THREE.Quaternion();
+        const detachedPosition = new THREE.Vector3();
+        const detachedScale = new THREE.Vector3();
+        const debugPanel = document.getElementById('ar-debug-panel');
+        const debugToggle = document.getElementById('btn-debug-toggle');
+        let debugEnabled = new URLSearchParams(location.search).get('debug') === '1';
+        const debugEvents = [];
+
+        function diagnosticSnapshot(event) {
+            const camera = sceneEl.camera;
+            const root = activeView && activeView.root.object3D;
+            return { event, detached: isDetached, detected: isDetected,
+                camera: camera ? { near: camera.near, far: camera.far, fov: camera.fov, aspect: camera.aspect } : {},
+                rootVisible: !!(root && root.visible), pivotVisible: !!(activePivot && activePivot.object3D.visible),
+                world: [worldPosX, worldPosY, worldPosZ], unitScale: detachedUnitScale,
+                displayPosition: root ? root.matrix.elements.slice(12, 15) : [],
+                modelReady: !!activePivot?.querySelector('a-gltf-model')?.getObject3D('mesh'),
+                modelVisible: !!activePivot?.querySelector('a-gltf-model')?.object3D.visible,
+                light: { enabled: environmentLight.enabled, brightness: environmentLight.brightness, samples: environmentLight.sampleCount, error: environmentLight.sampleError },
+                graceRemaining: lossGraceTimer === null ? 0 : Math.max(0, lossGraceDeadline - performance.now()) };
+        }
+        function debugLog(event) {
+            if (!debugEnabled) return;
+            const data = diagnosticSnapshot(event);
+            debugEvents.push(data); if (debugEvents.length > 5) debugEvents.shift();
+            debugPanel.textContent = debugEvents.map(row => JSON.stringify(row)).join('\n');
+            console.debug('[FYP AR]', data);
+        }
+        function setDebugEnabled(enabled) {
+            debugEnabled = !!enabled;
+            debugToggle.hidden = false;
+            debugPanel.hidden = !debugEnabled;
+            debugToggle.textContent = debugEnabled ? '调试：开' : '调试：关';
+            if (debugEnabled) debugLog('debug-enabled');
+        }
+        window.FYPDebug = { get enabled() { return debugEnabled; }, setEnabled: setDebugEnabled, snapshot: diagnosticSnapshot };
+        debugToggle.addEventListener('click', () => setDebugEnabled(!debugEnabled));
+
+        // 只测量蒙皮顶点，不修改模型。包络用于相机取景，不重新校准脚底。
+        function measureModelEnvelope(object) {
+            return SpiritGeometry.measure(object,THREE);
+        }
+        function configureDetachedFrame(recenter) {
+            if (!isDetached || !activeView || !sceneEl.camera) return;
+            const camera = sceneEl.camera;
+            const result=SpiritReality.frame(activeView.modelEnvelope,camera,{...realitySettings,yaw:currentYaw,x:recenter?0:worldPosX,y:recenter?-1.6:worldPosY},THREE);
+            realitySettings.modelScale=result.modelScale;detachedUnitScale=result.unit;
+            worldPosX=result.x;worldPosY=result.y;worldPosZ=result.z;
+            activePivot.setAttribute('scale',`${result.modelScale} ${result.modelScale} ${result.modelScale}`);
+            detachedCameraSignature = [camera.near, camera.far, camera.fov, camera.aspect].join(',');
+        }
+        function updateDetachedFrame() {
+            const camera = sceneEl.camera;
+            if (!camera) return;
+            const signature = [camera.near, camera.far, camera.fov, camera.aspect].join(',');
+            if (signature !== detachedCameraSignature) configureDetachedFrame(false);
+            camera.updateWorldMatrix(true, false);
+            sceneEl.object3D.updateWorldMatrix(true, false);
+            detachedPosition.set(worldPosX, worldPosY, worldPosZ).multiplyScalar(detachedUnitScale);
+            detachedScale.setScalar(detachedUnitScale);
+            detachedLocalMatrix.compose(detachedPosition, detachedIdentity, detachedScale);
+            detachedParentInverse.copy(sceneEl.object3D.matrixWorld).invert();
+            const frame = worldAnchor.object3D;
+            frame.matrixAutoUpdate = false;
+            frame.matrix.copy(detachedParentInverse).multiply(camera.matrixWorld).multiply(detachedLocalMatrix);
+            frame.matrixWorldNeedsUpdate = true;
+        }
+
+        let lossGraceTimer = null;
+        let lossGraceDeadline = 0;
+        let isDragging = false, isTouchingModel = false, startX = 0, startY = 0, initPinch = 0;
+        if (debugEnabled) setDebugEnabled(true);
+
+        function clearLossGrace() {
+            clearTimeout(lossGraceTimer);
+            lossGraceTimer = null;
+            lossGraceDeadline = 0;
+        }
+
+        function resetInteraction() {
+            isDragging = false;
+            isTouchingModel = false;
+            initPinch = 0;
+            filterYaw.reset();
+            filterScale.reset();
+        }
+
+        function syncTrackingUI() {
+            const hasContent = isDetached || isDetected || lossGraceTimer !== null;
+            hudPanel.classList.toggle('active', hasContent);
+            actionBar.classList.toggle('active', hasContent);
+            btnDetach.innerText = isDetached ? '重归卡面' : '近似合影';
+            document.getElementById('reality-panel').hidden=!isDetached;
+            btnTweakToggle.hidden=isDetached;
+            if(isDetached)tweakPanel.classList.remove('open');
+            btnDetach.classList.toggle('active-detach', isDetached);
+            scanGuide.innerText = isDetached
+                ? '近似合影：单指移动/旋转，身高锁定；构图距离不是实测距离'
+                : '请将卡牌平放桌面，镜头对准正面';
+            scanGuide.style.opacity = isDetached || !hasContent ? '1' : '0';
+        }
+
+        function applyCardPose() {
+            const px = activeCardConfig.posX || 0;
+            activePivot.setAttribute('position', `${px} ${tweakY} ${tweakZ}`);
+            activePivot.setAttribute('rotation', `${getBaseRotX()} ${currentYaw} 0`);
+            activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+        }
+
+        function beginRecovery(view) {
+            view.recovery = {
+                start: performance.now(),
+                position: new THREE.Vector3(),
+                quaternion: new THREE.Quaternion(),
+                scale: new THREE.Vector3()
+            };
+            view.root.object3D.matrix.decompose(
+                view.recovery.position, view.recovery.quaternion, view.recovery.scale);
+        }
+
+        function hideCardView(view) {
+            view.recovery = null;
+            if(view.summon)view.summon.reset();
+            fadeTokens.delete(view.pivot);
+            view.root.setAttribute('visible', false);
+        }
+
+        function expireLossGrace(view) {
+            if (activeView !== view || isDetached || view.tracked) return;
+            clearLossGrace();
+            hideCardView(view);
+            resetInteraction();
+            syncTrackingUI();
+        }
+
+        // 展示层与 MindAR 锚点是同级节点。只读取锚点矩阵，绝不改写它。
+        // 正常追踪精确复制原生姿态；丢失时停止复制；恢复的前 200ms 才进行插值。
+        const followPosition = new THREE.Vector3();
+        const followQuaternion = new THREE.Quaternion();
+        const followScale = new THREE.Vector3();
+        const blendedPosition = new THREE.Vector3();
+        const blendedQuaternion = new THREE.Quaternion();
+        const blendedScale = new THREE.Vector3();
+
+        function updateCardVisuals(now) {
+            if (!activeView) return;
+            if (lossGraceTimer !== null && now >= lossGraceDeadline) expireLossGrace(activeView);
+            const view = activeView;
+            const root = view.root.object3D;
+            if (!root.visible) return;
+            if (isDetached) {
+                updateDetachedFrame();
+                root.matrix.copy(worldAnchor.object3D.matrix);
+            } else if (view.tracked) {
+                const targetMatrix = view.anchor.object3D.matrix;
+                if (view.recovery) {
+                    const recovery = view.recovery;
+                    const k = Math.min(Math.max((now - recovery.start) / FOUND_FADE_MS, 0), 1);
+                    const eased = k * k * (3 - 2 * k);
+                    targetMatrix.decompose(followPosition, followQuaternion, followScale);
+                    blendedPosition.lerpVectors(recovery.position, followPosition, eased);
+                    blendedQuaternion.copy(recovery.quaternion).slerp(followQuaternion, eased);
+                    blendedScale.lerpVectors(recovery.scale, followScale, eased);
+                    root.matrix.compose(blendedPosition, blendedQuaternion, blendedScale);
+                    if (k >= 1) {
+                        view.recovery = null;
+                        root.matrix.copy(targetMatrix);
+                    }
+                } else {
+                    root.matrix.copy(targetMatrix);
+                }
+            }
+            root.matrixWorldNeedsUpdate = true;
+            SpiritSummon.update(view,now,isDetached);
+        }
+
+        AFRAME.registerComponent('card-visual-follow', {
+            tick: function () {
+                const now = performance.now();
+                updateCardVisuals(now);
+                updateEnvironmentLight(now);
+            }
+        });
+        sceneEl.setAttribute('card-visual-follow', '');
+
+        // 1€ Filter 实例用于平滑交互与微调过渡（绝不直接篡改 MindAR 内部 anchor.object3D.matrix 引用）
+        const filterYaw = new OneEuroFilter(60, 1.2, 0.02, 1.0);
+        const filterScale = new OneEuroFilter(60, 1.2, 0.02, 1.0);
+
+        let spiritCatalog = null;
+        let progressStorage; try { progressStorage=localStorage; } catch(_) {}
+        const spiritProgress = new SpiritData.UnlockStore(progressStorage);
+        const configReady = SpiritData.load('./cards_config.json').then(config=>{
+            spiritCatalog=config;buildCardTargets(config.cards);return config;
+        });
+
+        function getBaseRotX() {
+            return 90; // 平放桌面专用，沿用已存在的平放变换。
+        }
+
+        function forEachMaterial(pivotEl, fn) {
+            if (!pivotEl) return;
+            pivotEl.object3D.traverse((node) => {
+                if (node.isMesh && node.material) {
+                    const mats = Array.isArray(node.material) ? node.material : [node.material];
+                    mats.forEach(fn);
+                }
+            });
+        }
+
+        function setModelOpacity(pivotEl, opacityVal) {
+            forEachMaterial(pivotEl, (m) => {
+                m.transparent = opacityVal < 1.0;
+                m.opacity = opacityVal;
+                m.needsUpdate = true;
+            });
+        }
+
+        const fadeTokens = new WeakMap();
+        function fadeModel(pivotEl, ringEl, shadowEl, targetOpacity, ringTarget, durationMs) {
+            if (!pivotEl) return;
+            const token = {};
+            fadeTokens.set(pivotEl, token);
+            let startOpacity = 1.0;
+            forEachMaterial(pivotEl, (m) => { startOpacity = m.opacity; });
+            const startRing = ringEl && ringEl.getAttribute('material') ? ringEl.getAttribute('material').opacity : (shadowEl?.contactOpacity ?? 0.75);
+            const t0 = performance.now();
+
+            function step(now) {
+                if (fadeTokens.get(pivotEl) !== token) return;
+                const k = durationMs <= 0 ? 1 : Math.min(Math.max((performance.now() - t0) / durationMs, 0), 1);
+                const v = startOpacity + (targetOpacity - startOpacity) * k;
+                forEachMaterial(pivotEl, (m) => {
+                    const transparent = v < 1.0;
+                    if (m.transparent !== transparent) m.needsUpdate = true;
+                    m.transparent = transparent;
+                    m.opacity = v;
+                });
+                const rOp = startRing + (ringTarget - startRing) * k;
+                if (ringEl) ringEl.setAttribute('material', 'opacity', rOp);
+                // CanvasTexture 是手动赋给 mesh 的；更新组件属性会把它当作空 src 重置。
+                setContactShadowOpacity(shadowEl, rOp);
+                if (k < 1) {
+                    requestAnimationFrame(step);
+                } else if (targetOpacity >= 1.0) {
+                    setModelOpacity(pivotEl, 1.0);
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // 仅把头部贴图中的蓝色眼部区域提取为发光掩码，不让整个灰色头部自发光。
+        function createEyeEmissionMask(texture) {
+            if (!texture || !texture.image) return null;
+            const image = texture.image;
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width; canvas.height = image.height;
+            const context = canvas.getContext('2d');
+            try {
+                context.drawImage(image, 0, 0);
+                const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < pixels.data.length; i += 4) {
+                    const red = pixels.data[i], green = pixels.data[i + 1], blue = pixels.data[i + 2];
+                    const value = Math.round(255 * THREE.MathUtils.clamp(((green + blue) / 2 - red * 1.1) / 50, 0, 1));
+                    pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = value;
+                    pixels.data[i + 3] = 255;
+                }
+                context.putImageData(pixels, 0, 0);
+                const mask = new THREE.CanvasTexture(canvas);
+                mask.flipY = texture.flipY;
+                mask.colorSpace = THREE.NoColorSpace;
+                mask.wrapS = texture.wrapS; mask.wrapT = texture.wrapT;
+                return mask;
+            } catch (error) {
+                debugLog('eye-mask-unavailable');
+                return null;
+            }
+        }
+        function enhanceMaterial(m) {
+            if (!m.userData.spiritOriginal) m.userData.spiritOriginal = {
+                roughness: m.roughness, metalness: m.metalness, map: m.map,
+                normalMap: m.normalMap, roughnessMap: m.roughnessMap
+            };
+            const isRuneArm = !!m.emissiveMap;
+            const isHead = m.name === 'gray.002';
+            if (isRuneArm || isHead) {
+                if (!m.emissiveMap && isHead) m.emissiveMap = createEyeEmissionMask(m.map);
+                if (m.emissiveMap) {
+                    m.emissive = new THREE.Color(0x00f0ff);
+                    m.emissiveIntensity = 0.6;
+                }
+            }
+            m.needsUpdate = true;
+        }
+
+        // 预编译淡出使用的透明材质变体，避免首次丢卡时才同步编译而跳过整个宽限画面。
+        // 编译后立即恢复原材质标志，不改变正常显示的材质和灯光。
+        async function prepareFadeMaterials(obj3D) {
+            const renderer = sceneEl.renderer;
+            if (!renderer || !sceneEl.camera) return Promise.resolve();
+            const originalFlags = new Map();
+            obj3D.traverse(node => {
+                if (!node.isMesh || !node.material) return;
+                const materials = Array.isArray(node.material) ? node.material : [node.material];
+                materials.forEach(material => {
+                    if (originalFlags.has(material)) return;
+                    originalFlags.set(material, material.transparent);
+                });
+            });
+            const warmDraw = async () => {
+                const previous = renderer.getRenderTarget();
+                const visibility = [], culling = [], planes = new Map();
+                for(let node=obj3D;node;node=node.parent){visibility.push([node,node.visible]);node.visible=true;}
+                obj3D.traverse(node=>{if(node.isMesh){culling.push([node,node.frustumCulled]);node.frustumCulled=false;}});
+                originalFlags.forEach((_,material)=>(material.clippingPlanes||[]).forEach(plane=>{if(!planes.has(plane)){planes.set(plane,plane.constant);plane.constant=-1e12;}}));
+                try {
+                    sceneEl.object3D.updateMatrixWorld(true);
+                    // Default framebuffer has a different output colour-space shader and
+                    // MSAA pipeline from an offscreen target. Warm the real display path,
+                    // with the model fully clipped, so no monster flashes on screen.
+                    renderer.setRenderTarget(null);renderer.render(sceneEl.object3D,sceneEl.camera);
+                } finally {
+                    renderer.setRenderTarget(previous);
+                    planes.forEach((constant,plane)=>{plane.constant=constant;});
+                    visibility.forEach(([node,value])=>{node.visible=value;});
+                    culling.forEach(([node,value])=>{node.frustumCulled=value;});
+                }
+                const gl=renderer.getContext();
+                if(gl.fenceSync){
+                    const fence=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush();
+                    const deadline=performance.now()+5000;
+                    try {
+                        while(performance.now()<deadline){
+                            const status=gl.clientWaitSync(fence,0,0);
+                            if(status===gl.ALREADY_SIGNALED||status===gl.CONDITION_SATISFIED||status===gl.WAIT_FAILED)break;
+                            await new Promise(resolve=>setTimeout(resolve,10));
+                        }
+                    } finally {gl.deleteSync(fence);}
+                } else gl.finish();
+            };
+            try {
+                // Prime clipping state before compile; r158 initialises it during render.
+                // The not-yet-ready model remains hidden, so this does not reveal it early.
+                renderer.render(sceneEl.object3D,sceneEl.camera);
+                const compile=()=>renderer.compileAsync
+                    ? renderer.compileAsync(obj3D, sceneEl.camera, sceneEl.object3D)
+                    : renderer.compile(obj3D, sceneEl.camera, sceneEl.object3D);
+                await compile();
+                if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))return;
+                await warmDraw();
+                originalFlags.forEach((_,material)=>{material.transparent=true;material.needsUpdate=true;});
+                await compile();
+                if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))return;
+                await warmDraw();
+            } catch (error) {
+                console.warn('淡出材质预编译失败，将按需编译:', error);
+                return Promise.resolve();
+            } finally {
+                originalFlags.forEach((transparent, material) => {
+                    material.transparent = transparent;
+                    material.needsUpdate = true;
+                });
+            }
+        }
+
+        function buildCardTargets(cards) {
+            cards.forEach((c) => {
+                // 优先复用静态预置锚点 preset-anchor-0，确保 MindAR postMatrix 100% 已初始化
+                let anchor = (c.targetIndex === 0) ? document.getElementById('preset-anchor-0') : null;
+                if (!anchor) {
+                    anchor = document.createElement('a-entity');
+                    anchor.setAttribute('mindar-image-target', `targetIndex: ${c.targetIndex}`);
+                    sceneEl.appendChild(anchor);
+                }
+
+                // 模型与阴影只创建一次，永久留在独立展示层。
+                const visualRoot = document.createElement('a-entity');
+                visualRoot.classList.add('card-visual-root');
+                visualRoot.setAttribute('visible', false);
+                visualRoot.object3D.matrixAutoUpdate = false;
+                sceneEl.appendChild(visualRoot);
+
+                // 0. 脚底半透明径向渐变接触阴影圆盘 (Contact Shadow)
+                const shadowDisk = document.createElement('a-circle');
+                shadowDisk.contactOpacity = 0.85;
+                shadowDisk.setAttribute('radius', '0.26');
+                shadowDisk.setAttribute('position', '0 0 0.002');
+                shadowDisk.setAttribute('material', 'shader: flat; transparent: true; opacity: 0.85; depthWrite: false; side: double');
+                shadowDisk.addEventListener('loaded', () => {
+                    const mesh = shadowDisk.getObject3D('mesh');
+                    if (mesh && mesh.material) {
+                        const tex = new THREE.CanvasTexture(CONTACT_SHADOW_SRC);
+                        mesh.material.map = tex;
+                        mesh.material.transparent = true;
+                        mesh.material.needsUpdate = true;
+                    }
+                });
+                visualRoot.appendChild(shadowDisk);
+
+                // 保留空引用兼容原淡出函数；不创建法阵几何或动画。
+                const ring = null;
+
+                // 2. 怪兽枢轴容器：直接焊死在光环正圆心 (0, 0, FOOT_Z)
+                const pivot = document.createElement('a-entity');
+                const reveal = document.createElement('a-entity');
+                reveal.classList.add('summon-reveal');
+                pivot.appendChild(reveal);
+                const initScale = c.scale || 0.85;
+                const initPosY = c.posY !== undefined ? c.posY : 0;
+                const initPosZ = c.posZ !== undefined ? c.posZ : FOOT_Z;
+                const initRotX = 90;
+                pivot.setAttribute('position', `${c.posX || 0} ${initPosY} ${initPosZ}`);
+                pivot.setAttribute('rotation', `${initRotX} ${c.rotY || 0} 0`);
+                pivot.setAttribute('scale', `${initScale} ${initScale} ${initScale}`);
+
+                visualRoot.appendChild(pivot);
+                const view = { anchor, root: visualRoot, pivot, ring, shadow: shadowDisk, tracked: false, recovery: null, config:c, model:null, loadVersion:0, fadeReady:Promise.resolve() };
+                SpiritSummon.attach(view,reveal,THREE);
+                cardViews.push(view);
+
+                // 目标被捕获
+                anchor.addEventListener('targetFound', () => {
+                    if(window.SpiritApp && SpiritApp.mode!=='ar')return;
+                    if(!anchor.components['mindar-image-target']?.postMatrix)return;
+                    SpiritDiagnostics.mark('target_found',{monsterId:c.monsterId});
+                    view.tracked = true;
+                    if (activeView === view) isDetected = true;
+                    debugLog('target-found');
+                    if (isDetached) { recordDiscovery(c); return; }
+                    ensureViewModel(view).catch(error=>{if(error.name!=='AbortError' && activeView===view && window.SpiritApp)SpiritApp.fail(error.message);});
+                    const isSameCard = activeView === view;
+                    const wasVisible = isSameCard && visualRoot.object3D.visible;
+                    clearLossGrace();
+                    if (activeView && !isSameCard) hideCardView(activeView);
+
+                    isDetected = true;
+                    activeView = view;
+                    activePivot = pivot;
+                    activeAnchor = anchor;
+                    activeRing = ring;
+                    activeShadow = shadowDisk;
+                    activeCardConfig = c;
+                    if (!isSameCard) {
+                        currentYaw = c.rotY || 0;
+                        currentScale = c.scale || 0.85;
+                        tweakY = c.posY !== undefined ? c.posY : 0;
+                        tweakZ = c.posZ !== undefined ? c.posZ : FOOT_Z;
+                    }
+                    resetInteraction();
+                    applyCardPose();
+
+                    // 同步微调滑块数值
+                    sliderPosY.value = tweakY;
+                    sliderPosZ.value = tweakZ;
+                    sliderScale.value = currentScale;
+                    valPosY.innerText = Number(tweakY).toFixed(2);
+                    valPosZ.innerText = Number(tweakZ).toFixed(3);
+                    valScale.innerText = Number(currentScale).toFixed(2);
+
+                    visualRoot.setAttribute('visible', true);
+                    view.summon.found();
+                    shadowDisk.setAttribute('visible', 'true');
+                    if (wasVisible) beginRecovery(view);
+                    else view.recovery = null;
+
+                    // 重新捕获：0.2 秒平滑吸附恢复 100% 不透明
+                    fadeModel(pivot, ring, shadowDisk, 1.0, 0.75, FOUND_FADE_MS);
+
+                    uiName.innerText = c.name;
+                    uiTier.innerText = c.tier;
+                    uiPower.innerText = `纯灵值 (Spirit Power)：${c.power}`;
+                    uiDesc.innerText = c.desc;
+
+                    syncTrackingUI();
+                    recordDiscovery(c);
+                });
+
+                // 目标离开视野（开启 1.5 秒宽限期保护）
+                anchor.addEventListener('targetLost', () => {
+                    SpiritDiagnostics.mark('target_lost',{externalGraceMs:LOST_GRACE_MS});
+                    view.tracked = false;
+                    if(!isDetached)view.summon.lost();
+                    if (activeView === view) isDetected = false;
+                    debugLog('target-lost');
+                    if (isDetached) return;
+                    if (activeView === view && visualRoot.object3D.visible) {
+                        view.recovery = null;
+                        resetInteraction();
+                        fadeModel(pivot, ring, shadowDisk, GHOST_OPACITY, 0.3, LOST_FADE_MS);
+
+                        clearLossGrace();
+                        lossGraceDeadline = performance.now() + LOST_GRACE_MS;
+                        lossGraceTimer = setTimeout(() => expireLossGrace(view), LOST_GRACE_MS);
+                        syncTrackingUI();
+                    }
+                });
+            });
+        }
+
+        function disposeModel(object) {
+            if(!object)return;
+            const geometries=new Set(),materials=new Set(),textures=new Set();
+            object.traverse(node=>{
+                if(node.geometry)geometries.add(node.geometry);
+                if(node.material)(Array.isArray(node.material)?node.material:[node.material]).forEach(material=>materials.add(material));
+                if(node.skeleton?.boneTexture)textures.add(node.skeleton.boneTexture);
+            });
+            materials.forEach(material=>Object.values(material).forEach(value=>{if(value?.isTexture)textures.add(value);}));
+            textures.forEach(value=>value.dispose());materials.forEach(value=>value.dispose());geometries.forEach(value=>value.dispose());
+        }
+        function recordDiscovery(card) {
+            if(spiritProgress.unlock(card.monsterId,spiritCatalog)&&window.SpiritApp)SpiritApp.notice('首次发现：'+card.name+'。'+(spiritProgress.persistent?'已解锁本机图鉴。':'当前浏览器无法保存进度，刷新或切页会丢失；请允许网站存储。'));
+        }
+        function evictViewModel(view) {
+            if(!view.model)return;
+            view.loadVersion++;
+            if(view.rejectLoad)view.rejectLoad(new DOMException('已切换怪兽','AbortError'));
+            const mesh=view.model.getObject3D('mesh');
+            view.model.remove();disposeModel(mesh);view.model=null;view.modelEnvelope=null;view.rejectLoad=null;
+        }
+        function ensureViewModel(view) {
+            if(view.model){SpiritDiagnostics.mark('model_cache_hit',{ready:!!view.modelEnvelope,monsterId:view.config.monsterId});return view.fadeReady;}
+            SpiritDiagnostics.mark('glb_load_start',{monsterId:view.config.monsterId});
+            // A mobile memory budget: keep only the currently needed GLB resident.
+            cardViews.forEach(other=>{if(other!==view)evictViewModel(other);});
+            const model=document.createElement('a-gltf-model'),version=++view.loadVersion;
+            view.model=model;model.setAttribute('visible',false);
+            model.setAttribute('animation-mixer','clip: Idle; loop: repeat; crossFadeDuration: 0.3');
+            view.fadeReady=new Promise((resolve,reject)=>{
+                view.rejectLoad=reject;
+                model.addEventListener('model-error',()=>reject(Error('怪兽模型加载失败，请检查网络和模型路径。')),{once:true});
+                model.addEventListener('model-loaded',async()=>{
+                    SpiritDiagnostics.mark('glb_model_loaded');SpiritDiagnostics.resource(view.config.modelUrl);
+                    const object=model.getObject3D('mesh');
+                    try {
+                        if(view.loadVersion!==version){disposeModel(object);throw new DOMException('已取消','AbortError');}
+                        if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))throw new DOMException('AR 已暂停','AbortError');
+                        SpiritSummon.prepare(view,object,sceneEl.renderer);
+                        object.traverse(node=>{if(node.isMesh)(Array.isArray(node.material)?node.material:[node.material]).forEach(enhanceMaterial);});
+                        const clips=object.animations||[];
+                        const idle=clips.find(clip=>clip.name.toLowerCase()==='idle')||clips[0];
+                        if(idle)model.setAttribute('animation-mixer','clip',idle.name);
+                        SpiritDiagnostics.mark('material_prepare_start');
+                        await prepareFadeMaterials(object);
+                        SpiritDiagnostics.mark('material_prepare_complete');
+                        if(view.loadVersion!==version){disposeModel(object);throw new DOMException('已取消','AbortError');}
+                        if(document.hidden||(window.SpiritApp&&!['starting','ar'].includes(SpiritApp.mode)))throw new DOMException('AR 已暂停','AbortError');
+                        const animation=model.components['animation-mixer'];if(animation?.mixer)animation.mixer.setTime(0);
+                        view.modelEnvelope=measureModelEnvelope(object);
+                        model.setAttribute('visible',true);view.rejectLoad=null;
+                        if(isDetached&&activeView===view){configureDetachedFrame(true);updateCardVisuals(performance.now());}
+                        debugLog('model-ready');resolve(view);
+                        SpiritDiagnostics.mark('model_ready',{monsterId:view.config.monsterId});
+                    }catch(error){
+                        if(error.name==='AbortError'&&view.model===model){model.remove();disposeModel(object);view.model=null;view.modelEnvelope=null;view.rejectLoad=null;}
+                        reject(error);
+                    }
+                },{once:true});
+            });
+            // Stable URL lets the browser reuse downloaded bytes on revisits.
+            view.reveal.appendChild(model);model.setAttribute('src',view.config.modelUrl);
+            return view.fadeReady;
+        }
+
+        // 实时站位微调器事件绑定
+        btnTweakToggle.addEventListener('click', () => {
+            tweakPanel.classList.toggle('open');
+        });
+
+        function applyTweakSliders() {
+            if(isDetached)return; // Reality height is independent of card sliders.
+            tweakY = parseFloat(sliderPosY.value);
+            tweakZ = parseFloat(sliderPosZ.value);
+            currentScale = parseFloat(sliderScale.value);
+            valPosY.innerText = tweakY.toFixed(2);
+            valPosZ.innerText = tweakZ.toFixed(3);
+            valScale.innerText = currentScale.toFixed(2);
+
+            if (activePivot) {
+                if (!isDetached) {
+                    const px = activeCardConfig ? (activeCardConfig.posX || 0) : 0;
+                    activePivot.setAttribute('position', `${px} ${tweakY} ${tweakZ}`);
+                }
+                activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+                if (isDetached) configureDetachedFrame(false);
+            }
+        }
+
+        sliderPosY.addEventListener('input', applyTweakSliders);
+        sliderPosZ.addEventListener('input', applyTweakSliders);
+        sliderScale.addEventListener('input', applyTweakSliders);
+
+        btnTweakReset.addEventListener('click', () => {
+            sliderPosY.value = 0;
+            sliderPosZ.value = FOOT_Z;
+            sliderScale.value = activeCardConfig ? (activeCardConfig.scale || 0.85) : 0.85;
+            applyTweakSliders();
+        });
+
+        // 切换【踏入现实】合影模式
+        btnDetach.addEventListener('click', () => {
+            if (!activeView || (!isDetached && !activeView.root.object3D.visible)) return;
+            if(!isDetached){
+                if(!activeView.modelEnvelope){if(window.SpiritApp)SpiritApp.notice('模型仍在准备，请稍后再踏入现实。');return;}
+                realitySettings.heightM=activeCardConfig.monster.realityHeightM;realitySettings.distanceM=Number(document.getElementById('reality-distance').value)||5;
+                try{SpiritReality.frame(activeView.modelEnvelope,sceneEl.camera,{...realitySettings,x:0,y:-1.6,yaw:currentYaw},THREE);}catch(error){SpiritApp.notice(error.message);return;}
+                document.getElementById('reality-height-label').textContent='设定身高：'+realitySettings.heightM+' 米（锁定）'+(activeCardConfig.monster.realityHeightProvisional?' · 系统初值，待作者设定':'');
+            }
+            activePivot.object3D.updateMatrix();
+            const oldDisplay=activeView.root.object3D.matrix.clone().multiply(activePivot.object3D.matrix);
+            isDetached = !isDetached;
+            clearLossGrace();
+            activeView.recovery = null;
+            fadeTokens.delete(activePivot);
+            resetInteraction();
+
+            if (isDetached) {
+                worldAnchor.setAttribute('visible', 'true');
+                worldAnchor.setAttribute('position', `${worldPosX} ${worldPosY} ${worldPosZ}`);
+                activePivot.setAttribute('position', '0 0 0');
+                activePivot.setAttribute('rotation', `0 ${currentYaw} 0`);
+                activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+                setModelOpacity(activePivot, 1.0);
+                if(activeRing)activeRing.setAttribute('visible', false);
+                activeShadow.setAttribute('visible', false);
+                configureDetachedFrame(true);
+                updateCardVisuals(performance.now());
+            } else {
+                worldAnchor.setAttribute('visible', 'false');
+                isDetected = activeView.tracked;
+                applyCardPose();
+                activePivot.object3D.updateMatrix();
+                activeView.root.object3D.matrix.copy(oldDisplay).multiply(activePivot.object3D.matrix.clone().invert());
+                if(activeRing)activeRing.setAttribute('visible', true);
+                activeView.summon.found();
+                activeShadow.setAttribute('visible', true);
+                if (isDetected) {
+                    beginRecovery(activeView);
+                    fadeModel(activePivot, activeRing, activeShadow, 1.0, 0.75, FOUND_FADE_MS);
+                } else {
+                    hideCardView(activeView);
+                }
+            }
+            syncTrackingUI();
+            debugLog(isDetached ? 'detach-enter' : 'detach-return');
+        });
+        document.getElementById('reality-distance').addEventListener('change',event=>{
+            const old=realitySettings.distanceM;realitySettings.distanceM=Number(event.target.value);
+            try{configureDetachedFrame(false);updateCardVisuals(performance.now());}
+            catch(error){realitySettings.distanceM=old;event.target.value=old;SpiritApp.notice(error.message);}
+        });
+        function enterSpatialAR() {
+            if (activeCardConfig && SpiritApp.mode === 'ar') {
+                SpiritXR18.begin(activeCardConfig.monster, () => {
+                    SpiritApp.exit();
+                    if (SpiritApp.camera?.running) throw Error('Scanner camera is still active.');
+                }, () => cardViews.forEach(evictViewModel));
+            }
+        }
+        document.getElementById('btn-xr-m18').addEventListener('click', enterSpatialAR);
+        document.getElementById('btn-spatial-ar').addEventListener('click', enterSpatialAR);
+        document.getElementById('photo-close').addEventListener('click',()=>SpiritPhoto.close());
+
+        // 手势与鼠标交互
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.closest('[data-spirit-ui], #tweak-panel, #top-right-tools, #action-bar')) return;
+            if ((!isDetected && !isDetached) || !activePivot) return;
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging || (!isDetected && !isDetached) || !activePivot) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            startX = e.clientX;
+            startY = e.clientY;
+            applyDrag(dx, dy);
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        window.addEventListener('wheel', (e) => {
+            if(isDetached)return;
+            if (e.target.closest('[data-spirit-ui], #tweak-panel, #top-right-tools, #action-bar')) return;
+            if ((!isDetected && !isDetached) || !activePivot) return;
+            const factor = e.deltaY < 0 ? 1.08 : 0.92;
+            currentScale = filterScale.filter(Math.min(Math.max(currentScale * factor, 0.1), 2.5), performance.now());
+            sliderScale.value = currentScale;
+            valScale.innerText = currentScale.toFixed(2);
+            activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+            if (isDetached) configureDetachedFrame(false);
+        });
+
+        window.addEventListener('touchstart', (e) => {
+            isTouchingModel = false;
+            if (e.target.closest('[data-spirit-ui], #tweak-panel, #top-right-tools, #action-bar')) return;
+            if ((!isDetected && !isDetached) || !activePivot) return;
+            isTouchingModel = true;
+            initPinch = 0;
+            if (e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                initPinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isTouchingModel || e.target.closest('[data-spirit-ui], #tweak-panel, #top-right-tools, #action-bar')) return;
+            if ((!isDetected && !isDetached) || !activePivot) return;
+            if (e.touches.length === 1) {
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                applyDrag(dx, dy);
+            } else if (e.touches.length === 2 && initPinch > 0) {
+                if(isDetached)return;
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                currentScale = filterScale.filter(Math.min(Math.max(currentScale * (dist / initPinch), 0.1), 2.5), performance.now());
+                initPinch = dist;
+                sliderScale.value = currentScale;
+                valScale.innerText = currentScale.toFixed(2);
+                activePivot.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+                if (isDetached) configureDetachedFrame(false);
+            }
+        });
+
+        function endTouch(e) {
+            initPinch = 0;
+            if (isTouchingModel && e.touches.length === 1) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            } else {
+                isTouchingModel = false;
+            }
+        }
+        window.addEventListener('touchend', endTouch);
+        window.addEventListener('touchcancel', () => { isTouchingModel = false; initPinch = 0; });
+
+        function applyDrag(dx, dy) {
+            if (isDetached) {
+                currentYaw = filterYaw.filter(currentYaw + dx * 0.4, performance.now());
+                const pan=SpiritReality.pan(sceneEl.camera,realitySettings.distanceM,dx,dy,innerWidth,innerHeight);
+                worldPosX += pan.x;worldPosY += pan.y;
+                configureDetachedFrame(false);
+                activePivot.setAttribute('rotation', `0 ${currentYaw} 0`);
+            } else {
+                currentYaw = filterYaw.filter(currentYaw + dx * 0.5, performance.now());
+                activePivot.setAttribute('rotation', `${getBaseRotX()} ${currentYaw} 0`);
+            }
+        }
+
+        // 全屏切换
+        document.getElementById('btn-full').addEventListener('click', () => {
+            const el = document.documentElement;
+            if (!document.fullscreenElement) {
+                (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+            } else {
+                (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+            }
+        });
+
+        // 纯净 AR 合影拍照
+        btnSnap.addEventListener('click', () => {
+            shutterFlash.style.opacity = '1';
+            setTimeout(() => { shutterFlash.style.opacity = '0'; }, 80);
+
+            hudPanel.classList.remove('active');
+            actionBar.classList.remove('active');
+            scanGuide.style.opacity = '0';
+            const topTools = document.getElementById('top-right-tools');
+            const wasTweakOpen = tweakPanel.classList.contains('open');
+            topTools.style.display = 'none';
+            tweakPanel.classList.remove('open');
+
+            setTimeout(async () => {
+                const videoEl = document.querySelector('video');
+                try{if(window.SpiritApp?.mode==='ar')await SpiritPhoto.capture(sceneEl,videoEl);}
+                catch(error){if(window.SpiritApp)SpiritApp.notice(error.message);}
+                syncTrackingUI();
+                topTools.style.display = 'flex';
+                if (wasTweakOpen && window.SpiritApp?.mode==='ar') tweakPanel.classList.add('open');
+                if (isDetached) scanGuide.style.opacity = '1';
+            }, 150);
+        });
+    </script>
+    <script src="./js/spirit-app.js?v=m16-1"></script>
+<script src="./js/spirit-ui-theme.js?v=m16-1"></script>
+<script src="./js/spirit-ui-runtime.js?v=m16-1" data-page="scanner"></script>
+<div id="xr-overlay" data-spirit-ui data-phase="idle" hidden>
+  <header class="xr-caption">
+    <p class="xr-identity">THE SPIRIT <span>空间 AR · M19</span></p>
+    <p id="xr-monster"></p>
+    <p id="xr-status" role="status"></p>
+    <p id="xr-loading" hidden></p>
+  </header>
+  <div class="xr-seeker" aria-hidden="true"></div>
+  <footer class="xr-footer">
+    <p id="xr-feedback" role="status" hidden></p>
+    <section id="xr-compare" aria-label="释宿画质对比" hidden>
+      <div class="xr-choices" role="group" aria-label="画质版本">
+        <button type="button" data-quality="original" aria-pressed="true">原版</button>
+        <button type="button" data-quality="a" aria-pressed="false">A 柔化凹凸</button>
+        <button type="button" data-quality="b" aria-pressed="false">B 柔化凹凸与反光</button>
+      </div>
+      <p id="xr-compare-stats" aria-live="off">运行 0:00 · FPS — · 卡顿 0 次</p>
+    </section>
+    <div class="xr-controls">
+      <button type="button" id="xr-start" hidden>进入空间 AR</button>
+      <button type="button" id="xr-place" aria-disabled="true" hidden>放置怪兽</button>
+      <button type="button" id="xr-replace" hidden>重新放置</button>
+      <a href="./index.html" id="xr-back">返回卡牌</a>
+    </div>
+  </footer>
+</div>
+<script src="./js/spirit-viewer.js"></script><script src="./js/spirit-xr-m18-session.js"></script><script src="./js/spirit-m19-phone-compare.js"></script><script src="./js/spirit-xr-m18.js?v=m19-phone-1"></script></body>
+</html>

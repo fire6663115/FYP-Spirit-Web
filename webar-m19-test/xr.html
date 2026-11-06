@@ -1,0 +1,27 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>THE SPIRIT - M18</title><link rel="stylesheet" href="./css/spirit-xr-m18.css"><script src="./js/spirit-data.js"></script><script src="./js/spirit-geometry.js"></script></head><body><div id="xr-overlay" data-spirit-ui data-phase="idle" hidden>
+  <header class="xr-caption">
+    <p class="xr-identity">THE SPIRIT <span>空间 AR · M19</span></p>
+    <p id="xr-monster"></p>
+    <p id="xr-status" role="status"></p>
+    <p id="xr-loading" hidden></p>
+  </header>
+  <div class="xr-seeker" aria-hidden="true"></div>
+  <footer class="xr-footer">
+    <p id="xr-feedback" role="status" hidden></p>
+    <section id="xr-compare" aria-label="释宿画质对比" hidden>
+      <div class="xr-choices" role="group" aria-label="画质版本">
+        <button type="button" data-quality="original" aria-pressed="true">原版</button>
+        <button type="button" data-quality="a" aria-pressed="false">A 柔化凹凸</button>
+        <button type="button" data-quality="b" aria-pressed="false">B 柔化凹凸与反光</button>
+      </div>
+      <p id="xr-compare-stats" aria-live="off">运行 0:00 · FPS — · 卡顿 0 次</p>
+    </section>
+    <div class="xr-controls">
+      <button type="button" id="xr-start" hidden>进入空间 AR</button>
+      <button type="button" id="xr-place" aria-disabled="true" hidden>放置怪兽</button>
+      <button type="button" id="xr-replace" hidden>重新放置</button>
+      <a href="./index.html" id="xr-back">返回卡牌</a>
+    </div>
+  </footer>
+</div>
+<script src="./js/spirit-viewer.js"></script><script src="./js/spirit-xr-m18-session.js"></script><script src="./js/spirit-m19-phone-compare.js"></script><script src="./js/spirit-xr-m18.js?v=m19-phone-1"></script></body></html>
